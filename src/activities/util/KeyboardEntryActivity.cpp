@@ -100,8 +100,7 @@ const fui::KeyboardKey NUMBER_ROW1[] = {UK("1", "1", '1'), UK("2", "2", '2'), UK
 const fui::KeyboardKey NUMBER_ROW2[] = {UK("4", "4", '4'), UK("5", "5", '5'), UK("6", "6", '6')};
 const fui::KeyboardKey NUMBER_ROW3[] = {UK("7", "7", '7'), UK("8", "8", '8'), UK("9", "9", '9')};
 const fui::KeyboardKey NUMBER_BOTTOM[] = {UKS("Del", fui::KeyKind::Delete, fui::QWERTY_KEY_BACKSPACE, 1),
-                                          UK("0", "0", '0'),
-                                          UKS("OK", fui::KeyKind::Ok, fui::QWERTY_KEY_ENTER, 1)};
+                                          UK("0", "0", '0'), UKS("OK", fui::KeyKind::Ok, fui::QWERTY_KEY_ENTER, 1)};
 
 #undef UK
 #undef UKA
@@ -993,10 +992,9 @@ void KeyboardEntryActivity::render(RenderLock&&) {
   props.inputMask = static_cast<uint16_t>(fui::InputTouch | fui::InputLongPress);
   props.selectedIndex = cursorMode ? -1 : static_cast<int16_t>(selectedLogicalIndex());
   // The 12-column Arabic rows need the smaller font for wide isolated letters.
-  props.labelText.font =
-      inputType != InputType::Number && layoutId == fui::KeyboardLayoutId::ArabicAr && !symbols
-          ? fui::GfxRendererTarget::FONT_SMALL
-          : fui::GfxRendererTarget::FONT_BODY;
+  props.labelText.font = inputType != InputType::Number && layoutId == fui::KeyboardLayoutId::ArabicAr && !symbols
+                             ? fui::GfxRendererTarget::FONT_SMALL
+                             : fui::GfxRendererTarget::FONT_BODY;
   props.altText.font = fui::GfxRendererTarget::FONT_SMALL;
   props.gap = static_cast<int16_t>(metrics.keyboardKeySpacing);
   props.padding = fui::Insets{0, 0, 0, 0};

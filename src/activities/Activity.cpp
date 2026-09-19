@@ -1,7 +1,6 @@
 #include "Activity.h"
 
 #include "ActivityManager.h"
-
 #include "CrossPointSettings.h"
 
 void Activity::onEnter() { LOG_DBG("ACT", "Entering activity: %s", name.c_str()); }

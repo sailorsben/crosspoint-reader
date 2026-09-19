@@ -31,17 +31,28 @@ constexpr int kNavIconSize = 24;
 
 const uint8_t* iconForName(const UIIcon icon) {
   switch (icon) {
-    case UIIcon::Folder: return FolderIcon;
-    case UIIcon::Book: return BookIcon;
-    case UIIcon::Recent: return RecentIcon;
-    case UIIcon::Settings: return Settings2Icon;
-    case UIIcon::Transfer: return TransferIcon;
-    case UIIcon::Library: return LibraryIcon;
-    case UIIcon::Wifi: return WifiIcon;
-    case UIIcon::Hotspot: return HotspotIcon;
-    case UIIcon::Bookmark: return BookmarkIcon;
-    case UIIcon::Blocks: return BlocksIcon;
-    default: return nullptr;
+    case UIIcon::Folder:
+      return FolderIcon;
+    case UIIcon::Book:
+      return BookIcon;
+    case UIIcon::Recent:
+      return RecentIcon;
+    case UIIcon::Settings:
+      return Settings2Icon;
+    case UIIcon::Transfer:
+      return TransferIcon;
+    case UIIcon::Library:
+      return LibraryIcon;
+    case UIIcon::Wifi:
+      return WifiIcon;
+    case UIIcon::Hotspot:
+      return HotspotIcon;
+    case UIIcon::Bookmark:
+      return BookmarkIcon;
+    case UIIcon::Blocks:
+      return BlocksIcon;
+    default:
+      return nullptr;
   }
 }
 

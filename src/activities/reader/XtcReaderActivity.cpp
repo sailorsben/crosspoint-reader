@@ -11,7 +11,7 @@
 namespace {
 constexpr int PAGE_TURN_RATES[] = {0, 1, 3, 6, 12};
 constexpr size_t PAGE_TURN_RATE_COUNT = sizeof(PAGE_TURN_RATES) / sizeof(PAGE_TURN_RATES[0]);
-}
+}  // namespace
 
 #include "CrossPointSettings.h"
 #include "ProgressFile.h"
@@ -105,9 +105,9 @@ void XtcReaderActivity::onReaderMenuConfirm(const XtcReaderMenuActivity::MenuAct
       if (pageCount == 0) return;
       const size_t maxLength = std::to_string(static_cast<unsigned long>(pageCount)).length();
       const uint32_t displayPage = std::min(currentPage + 1, pageCount);
-      auto keyboard = makeUniqueNoThrow<KeyboardEntryActivity>(
-          renderer, mappedInput, tr(STR_GO_TO_PAGE), std::to_string(static_cast<unsigned long>(displayPage)), maxLength,
-          InputType::Number);
+      auto keyboard = makeUniqueNoThrow<KeyboardEntryActivity>(renderer, mappedInput, tr(STR_GO_TO_PAGE),
+                                                               std::to_string(static_cast<unsigned long>(displayPage)),
+                                                               maxLength, InputType::Number);
       if (!keyboard) {
         LOG_ERR("XTR", "OOM: Go to Page keyboard");
         return;
