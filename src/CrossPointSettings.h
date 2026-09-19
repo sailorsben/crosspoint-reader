@@ -73,6 +73,15 @@ class CrossPointSettings : public PersistableStore<CrossPointSettings> {
     ORIENTATION_COUNT
   };
 
+  // VesperUI/non-reader screen orientation. Kept separate from ORIENTATION so
+  // menus, Home and Library can be landscape without changing book layout.
+  enum INTERFACE_ORIENTATION {
+    UI_PORTRAIT = 0,
+    UI_LANDSCAPE_CW = 1,
+    UI_LANDSCAPE_CCW = 2,
+    INTERFACE_ORIENTATION_COUNT
+  };
+
   // XTC pages stay in their pre-rendered framebuffer layout; this profile
   // controls only how reader taps are interpreted while an XTC page is shown.
   enum XTC_TAP_PROFILE {
@@ -182,8 +191,8 @@ class CrossPointSettings : public PersistableStore<CrossPointSettings> {
     LONG_PRESS_BUTTON_BEHAVIOR_COUNT
   };
 
-  // UI Theme
-  enum UI_THEME { CLASSIC = 0, LYRA = 1, LYRA_3_COVERS = 2, ROUNDEDRAFF = 3 };
+  // UI Theme. Append-only: values are persisted in settings.json.
+  enum UI_THEME { CLASSIC = 0, LYRA = 1, LYRA_3_COVERS = 2, ROUNDEDRAFF = 3, VESPERUI = 4 };
 
   // Image rendering in EPUB reader
   enum IMAGE_RENDERING { IMAGES_DISPLAY = 0, IMAGES_PLACEHOLDER = 1, IMAGES_SUPPRESS = 2, IMAGE_RENDERING_COUNT };
@@ -307,7 +316,9 @@ class CrossPointSettings : public PersistableStore<CrossPointSettings> {
   // Defaults to Disabled so shortcut-based bookmark toggling remains opt-in.
   uint8_t longPressMenuFunction = LP_MENU_DISABLED;
   // UI Theme
-  uint8_t uiTheme = LYRA;
+  uint8_t uiTheme = VESPERUI;
+  // Orientation for Home, Library, Settings and other non-reader UI.
+  uint8_t interfaceOrientation = UI_PORTRAIT;
   // Sunlight fading compensation
   uint8_t fadingFix = 0;
   // Power button return from footnotes (1 = enabled, 0 = disabled)

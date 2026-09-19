@@ -52,6 +52,7 @@ class ReaderActivity : public Activity {
 
   void onEnter() override;
   void onExit() override;
+  void applyDisplayOrientation() override;
   void loop() override;
   void render(RenderLock&& lock) override;
 

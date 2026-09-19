@@ -34,6 +34,11 @@ class Activity {
 
   virtual void render(RenderLock&&) {}
 
+  // Called by ActivityManager before input and rendering. Non-reader screens
+  // use SETTINGS.interfaceOrientation; ReaderActivity overrides this so book
+  // orientation stays independent from the surrounding UI.
+  virtual void applyDisplayOrientation();
+
   // If immediate is true, the update will be triggered immediately.
   // Otherwise, it will be deferred until the end of the current loop iteration.
   virtual void requestUpdate(bool immediate = false);

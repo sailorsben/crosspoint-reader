@@ -46,6 +46,8 @@ void ReaderActivity::applyInitialOrientation() { ReaderUtils::applyOrientation(r
 
 void ReaderActivity::disableFastInitialRefresh() { pagesUntilFullRefresh = 0; }
 
+void ReaderActivity::applyDisplayOrientation() { applyInitialOrientation(); }
+
 void ReaderActivity::onEnter() {
   Activity::onEnter();
 
