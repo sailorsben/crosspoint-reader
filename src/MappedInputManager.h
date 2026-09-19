@@ -1,10 +1,9 @@
 #pragma once
 
+#include <GfxRenderer.h>
 #include <HalGPIO.h>
 
 #include "util/HomeButtonInput.h"
-
-class GfxRenderer;
 namespace freeink {
 namespace ui {
 enum class ScreenEdge : uint8_t;
@@ -58,6 +57,7 @@ class MappedInputManager {
   bool isPressed(Button button) const;
   bool hasTouch() const;
   bool wasScreenTapped(int& x, int& y) const;
+  bool wasScreenTappedForOrientation(int& x, int& y, GfxRenderer::Orientation tapOrientation) const;
   bool wasScreenTouchDown(int& x, int& y) const;
   // One-shot long-press from the SDK touch classifier, fired WHILE the finger
   // is still down (stationary contact held past the SDK threshold). Consuming

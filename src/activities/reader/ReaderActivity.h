@@ -33,6 +33,7 @@ class ReaderActivity : public Activity {
 
   virtual void renderBook() = 0;
   virtual void applyInitialOrientation();
+  virtual GfxRenderer::Orientation tapInputOrientation() const { return renderer.getOrientation(); }
   virtual void onEndOfBookRendered() {}
 
   bool handleBackNavigation();

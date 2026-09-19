@@ -197,7 +197,10 @@ class GfxRenderer {
   // Screen ops
   int getScreenWidth() const;
   int getScreenHeight() const;
+  int getScreenWidthForOrientation(Orientation logicalOrientation) const;
+  int getScreenHeightForOrientation(Orientation logicalOrientation) const;
   void tapToLogical(float nx, float ny, int& outX, int& outY) const;
+  void tapToLogicalForOrientation(float nx, float ny, Orientation logicalOrientation, int& outX, int& outY) const;
   void displayBuffer(HalDisplay::RefreshMode refreshMode = HalDisplay::FAST_REFRESH) const;
   // One-shot: the next displayBuffer()/displayBufferAsync() call uses `mode`
   // instead of what its caller asked for, then the override clears itself.
