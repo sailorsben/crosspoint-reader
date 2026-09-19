@@ -117,13 +117,16 @@ bool drawVesperNavIcon(const GfxRenderer& renderer, const UIIcon icon, const int
   const int cx = x + size / 2;
   switch (icon) {
     case UIIcon::Folder: {
-      const int top = y + 7;
-      renderer.drawLine(x + 2, top + 3, x + 9, top + 3, 2, true);
-      renderer.drawLine(x + 9, top + 3, x + 13, top + 7, 2, true);
-      renderer.drawLine(x + 13, top + 7, x + size - 2, top + 7, 2, true);
-      renderer.drawLine(x + 2, top + 3, x + 2, y + size - 3, 2, true);
-      renderer.drawLine(x + 2, y + size - 3, x + size - 2, y + size - 3, 2, true);
-      renderer.drawLine(x + size - 2, top + 7, x + size - 2, y + size - 3, 2, true);
+      const int top = y + 3;
+      const int bottom = y + size - 2;
+      renderer.drawLine(x + 2, top + 5, x + 9, top + 5, 2, true);
+      renderer.drawLine(x + 9, top + 5, x + 13, top + 1, 2, true);
+      renderer.drawLine(x + 13, top + 1, x + 20, top + 1, 2, true);
+      renderer.drawLine(x + 20, top + 1, x + 23, top + 5, 2, true);
+      renderer.drawLine(x + 23, top + 5, x + size - 2, top + 5, 2, true);
+      renderer.drawLine(x + 2, top + 5, x + 2, bottom, 2, true);
+      renderer.drawLine(x + size - 2, top + 5, x + size - 2, bottom, 2, true);
+      renderer.drawLine(x + 2, bottom, x + size - 2, bottom, 2, true);
       return true;
     }
     case UIIcon::Library:
@@ -236,7 +239,6 @@ void VesperTheme::drawRecentBookCover(GfxRenderer& renderer, const Rect rect,
   const VesperHome::Layout layout = VesperHome::bookLayout(rect, static_cast<int>(recentBooks.size()));
 
   if (!bufferRestored) {
-    drawSectionLabel(renderer, layout.currentHeading, tr(STR_CONTINUE_READING));
     renderer.drawRect(layout.hero.x, layout.hero.y, layout.hero.width, layout.hero.height);
 
     const Rect heroCover = VesperHome::coverRect(layout, 0);

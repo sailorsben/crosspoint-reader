@@ -30,8 +30,8 @@ inline Layout bookLayout(const Rect band, const int bookCount) {
   if (!l.landscape) {
     constexpr int pad = 14;
     constexpr int gap = 8;
-    l.currentHeading = Rect{band.x + pad, band.y, band.width - 2 * pad, 26};
-    l.hero = Rect{band.x + pad, band.y + 30, band.width - 2 * pad, 330};
+    l.currentHeading = {};
+    l.hero = Rect{band.x + pad, band.y + 2, band.width - 2 * pad, 356};
     const int coverWidth = std::min(180, l.hero.width * 42 / 100);
     l.heroCover = Rect{l.hero.x + 7, l.hero.y + 7, coverWidth, l.hero.height - 14};
     const int textX = l.heroCover.x + l.heroCover.width + 14;
@@ -52,8 +52,8 @@ inline Layout bookLayout(const Rect band, const int bookCount) {
   constexpr int gap = 12;
   const int leftWidth = band.width * 64 / 100;
   l.dividerX = band.x + leftWidth;
-  l.currentHeading = Rect{band.x + pad, band.y, leftWidth - 2 * pad, 24};
-  l.hero = Rect{band.x + pad, band.y + 28, leftWidth - 2 * pad, band.height - 32};
+  l.currentHeading = {};
+  l.hero = Rect{band.x + pad, band.y + 2, leftWidth - 2 * pad, band.height - 6};
   const int coverWidth = std::min(190, l.hero.width * 39 / 100);
   l.heroCover = Rect{l.hero.x + 7, l.hero.y + 7, coverWidth, l.hero.height - 14};
   const int textX = l.heroCover.x + l.heroCover.width + 14;
