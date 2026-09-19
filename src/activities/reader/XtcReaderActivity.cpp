@@ -129,7 +129,7 @@ void XtcReaderActivity::onReaderMenuConfirm(const XtcReaderMenuActivity::MenuAct
           if (ch < '0' || ch > '9') return;
           page = page * 10 + static_cast<uint32_t>(ch - '0');
         }
-        page = std::clamp(page, 1u, pageCount);
+        page = std::clamp(page, static_cast<uint32_t>(1), pageCount);
         currentPage = page - 1;
         requestUpdate();
       });
