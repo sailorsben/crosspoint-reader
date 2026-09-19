@@ -161,8 +161,8 @@ XtcError XtcParser::readHeader() {
 }
 
 XtcError XtcParser::readTitle() {
-  constexpr auto titleOffset = 0x38;
-  if (!m_file.seek(titleOffset)) {
+  const uint64_t titleOffset = m_header.metadataOffset ? m_header.metadataOffset : sizeof(XtcHeader);
+  if (!m_file.seek64(titleOffset)) {
     return XtcError::READ_ERROR;
   }
 
@@ -176,8 +176,8 @@ XtcError XtcParser::readTitle() {
 
 XtcError XtcParser::readAuthor() {
   // Read author as null-terminated UTF-8 string with max length 64, directly following title
-  constexpr auto authorOffset = 0xB8;
-  if (!m_file.seek(authorOffset)) {
+  const uint64_t authorOffset = (m_header.metadataOffset ? m_header.metadataOffset : sizeof(XtcHeader)) + 128;
+  if (!m_file.seek64(authorOffset)) {
     return XtcError::READ_ERROR;
   }
 
@@ -222,6 +222,35 @@ XtcError XtcParser::readFirstPageInfo() {
   if (bytesRead != sizeof(PageTableEntry)) {
     LOG_DBG("XTC", "Failed to read first page table entry");
     return XtcError::READ_ERROR;
+  }
+
+  // Page payload magic is authoritative for bit depth. Some valid XTC
+  // generators store XTH grayscale pages inside an XTC container.
+  if (entry.dataOffset > fileSize || sizeof(uint32_t) > fileSize - entry.dataOffset) {
+    LOG_DBG("XTC", "First page offset exceeds file bounds: %llu", static_cast<unsigned long long>(entry.dataOffset));
+    return XtcError::CORRUPTED_HEADER;
+  }
+  if (!m_file.seek64(entry.dataOffset)) {
+    LOG_DBG("XTC", "Failed to seek to first page at %llu", static_cast<unsigned long long>(entry.dataOffset));
+    return XtcError::READ_ERROR;
+  }
+  uint32_t pageMagic = 0;
+  if (m_file.read(reinterpret_cast<uint8_t*>(&pageMagic), sizeof(pageMagic)) != sizeof(pageMagic)) {
+    LOG_DBG("XTC", "Failed to read first page magic");
+    return XtcError::READ_ERROR;
+  }
+  const uint8_t containerBitDepth = m_bitDepth;
+  if (pageMagic == XTG_MAGIC) {
+    m_bitDepth = 1;
+  } else if (pageMagic == XTH_MAGIC) {
+    m_bitDepth = 2;
+  } else {
+    LOG_DBG("XTC", "Invalid first page magic: 0x%08X", pageMagic);
+    return XtcError::INVALID_MAGIC;
+  }
+  if (m_bitDepth != containerBitDepth) {
+    LOG_DBG("XTC", "Container/page bit depth mismatch: container=%u page=%u; using page payload", containerBitDepth,
+            m_bitDepth);
   }
 
   m_defaultWidth = entry.width;
@@ -283,11 +312,12 @@ XtcError XtcParser::readChapters() {
   }
 
   uint64_t chapterOffset = 0;
-  if (!m_file.seek(0x30)) {
-    return XtcError::READ_ERROR;
-  }
-  if (m_file.read(reinterpret_cast<uint8_t*>(&chapterOffset), sizeof(chapterOffset)) != sizeof(chapterOffset)) {
-    return XtcError::READ_ERROR;
+  // Legacy 48-byte headers have no chapterOffset field; with metadata present,
+  // chapter records follow the fixed 256-byte metadata block.
+  if (m_header.hasMetadata && m_header.metadataOffset == XTC_LEGACY_HEADER_SIZE) {
+    chapterOffset = m_header.metadataOffset + 256;
+  } else {
+    chapterOffset = m_header.chapterOffset;
   }
 
   if (chapterOffset == 0) {
