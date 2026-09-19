@@ -2,6 +2,7 @@
 #include <ArduinoJson.h>
 #include <PersistableStore.h>
 
+#include <cstdint>
 #include <string>
 #include <vector>
 
@@ -10,6 +11,11 @@ struct RecentBook {
   std::string title;
   std::string author;
   std::string coverBmpPath;
+
+  // Transient Home UI state; deliberately omitted from recent.json.
+  int progressPercent = -1;
+  uint32_t progressCurrent = 0;
+  uint32_t progressTotal = 0;
 
   bool operator==(const RecentBook& other) const { return path == other.path; }
 };

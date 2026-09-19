@@ -865,6 +865,62 @@ bool Epub::generateThumbBmp(int height) const {
   return false;
 }
 
+std::string Epub::getVesperThumbBmpPath(const int width, const int height) const {
+  return cachePath + "/thumb_vui2_" + std::to_string(width) + "x" + std::to_string(height) + ".bmp";
+}
+
+bool Epub::generateVesperThumbBmp(const int width, const int height) const {
+  if (width <= 0 || height <= 0) return false;
+  const std::string outputPath = getVesperThumbBmpPath(width, height);
+  if (Storage.exists(outputPath.c_str())) return true;
+
+  if (!bookMetadataCache || !bookMetadataCache->isLoaded()) {
+    LOG_ERR("EBP", "Cannot generate VesperUI thumb BMP, cache not loaded");
+    return false;
+  }
+
+  const auto coverImageHref = bookMetadataCache->coreMetadata.coverItemHref;
+  if (coverImageHref.empty()) {
+    LOG_DBG("EBP", "No known cover image for VesperUI thumbnail");
+    return false;
+  }
+
+  const bool isJpeg = FsHelpers::hasJpgExtension(coverImageHref);
+  const bool isPng = FsHelpers::hasPngExtension(coverImageHref);
+  if (!isJpeg && !isPng) {
+    LOG_ERR("EBP", "Unsupported VesperUI cover format: %s", coverImageHref.c_str());
+    return false;
+  }
+
+  const std::string tempPath = getCachePath() + (isJpeg ? "/.vesper-cover.jpg" : "/.vesper-cover.png");
+  HalFile source;
+  if (!Storage.openFileForWrite("EBP", tempPath, source)) return false;
+  const bool extracted = readItemContentsToStream(coverImageHref, source, 4096);
+  source.close();
+  if (!extracted || !Storage.openFileForRead("EBP", tempPath, source)) {
+    Storage.remove(tempPath.c_str());
+    return false;
+  }
+
+  HalFile thumb;
+  if (!Storage.openFileForWrite("EBP", outputPath, thumb)) {
+    source.close();
+    Storage.remove(tempPath.c_str());
+    return false;
+  }
+
+  const bool success =
+      isJpeg ? JpegToBmpConverter::jpegFileToVesperThumbBmpStreamWithSize(source, thumb, width, height)
+             : PngToBmpConverter::pngFileToVesperThumbBmpStreamWithSize(source, thumb, width, height);
+  source.close();
+  thumb.close();
+  Storage.remove(tempPath.c_str());
+
+  if (!success) Storage.remove(outputPath.c_str());
+  LOG_DBG("EBP", "Generated VesperUI gray thumb %dx%d: %s", width, height, success ? "yes" : "no");
+  return success;
+}
+
 uint8_t* Epub::readItemContentsToBytes(const std::string& itemHref, size_t* size, const bool trailingNullByte) const {
   if (itemHref.empty()) {
     LOG_DBG("EBP", "Failed to read item, empty href");

@@ -108,6 +108,10 @@ constexpr ThemeMetrics landscapeValues = [] {
 
 class VesperTheme final : public LyraTheme {
  public:
+  // Draws only the cover pixels, respecting the current renderer mode. Home
+  // reuses this for the LSB/MSB grayscale passes.
+  static bool drawBookCover(const GfxRenderer& renderer, const RecentBook& book, Rect target);
+
   void drawHeader(const GfxRenderer& renderer, Rect rect, const char* title,
                   const char* subtitle = nullptr) const override;
   void drawRecentBookCover(GfxRenderer& renderer, Rect rect, const std::vector<RecentBook>& recentBooks,

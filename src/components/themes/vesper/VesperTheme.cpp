@@ -5,6 +5,7 @@
 #include <I18n.h>
 
 #include <algorithm>
+#include <cstdio>
 #include <string>
 #include <vector>
 
@@ -26,8 +27,8 @@
 #include "fontIds.h"
 
 namespace {
-constexpr int kLogoSize = VesperAssets::LOGO_SIZE;
-constexpr int kNavIconSize = 24;
+constexpr int kLogoSourceSize = VesperAssets::LOGO_SIZE;
+constexpr int kNavIconSize = 28;
 
 const uint8_t* iconForName(const UIIcon icon) {
   switch (icon) {
@@ -56,12 +57,14 @@ const uint8_t* iconForName(const UIIcon icon) {
   }
 }
 
-void drawVesperLogo(const GfxRenderer& renderer, const int x, const int y) {
-  constexpr int rowBytes = (kLogoSize + 7) / 8;
-  for (int row = 0; row < kLogoSize; row++) {
-    for (int col = 0; col < kLogoSize; col++) {
-      const uint8_t byte = VesperAssets::Logo36[row * rowBytes + (col >> 3)];
-      if (((byte >> (7 - (col & 7))) & 1) == 0) renderer.drawPixel(x + col, y + row, true);
+void drawVesperLogo(const GfxRenderer& renderer, const int x, const int y, const int size) {
+  constexpr int rowBytes = (kLogoSourceSize + 7) / 8;
+  for (int row = 0; row < size; row++) {
+    const int srcRow = row * kLogoSourceSize / size;
+    for (int col = 0; col < size; col++) {
+      const int srcCol = col * kLogoSourceSize / size;
+      const uint8_t byte = VesperAssets::Logo64[srcRow * rowBytes + (srcCol >> 3)];
+      if (((byte >> (7 - (srcCol & 7))) & 1) == 0) renderer.drawPixel(x + col, y + row, true);
     }
   }
 }
@@ -70,39 +73,6 @@ void drawSectionLabel(const GfxRenderer& renderer, const Rect& rect, const char*
   if (!label || rect.width <= 0 || rect.height <= 0) return;
   const std::string text = renderer.truncatedText(UI_10_FONT_ID, label, rect.width, EpdFontFamily::BOLD);
   renderer.drawText(UI_10_FONT_ID, rect.x, rect.y + 2, text.c_str(), true, EpdFontFamily::BOLD);
-}
-
-bool drawCover(const GfxRenderer& renderer, const RecentBook& book, const Rect& target, const int thumbHeight) {
-  if (target.width <= 0 || target.height <= 0) return false;
-  bool rendered = false;
-  if (!book.coverBmpPath.empty()) {
-    const std::string coverPath = UITheme::getCoverThumbPath(book.coverBmpPath, thumbHeight);
-    HalFile file;
-    if (Storage.openFileForRead("VUI", coverPath, file)) {
-      Bitmap bitmap(file);
-      if (bitmap.parseHeaders() == BmpReaderError::Ok && bitmap.getWidth() > 0 && bitmap.getHeight() > 0) {
-        int drawWidth = target.width;
-        int drawHeight = static_cast<int>((static_cast<int64_t>(drawWidth) * bitmap.getHeight()) / bitmap.getWidth());
-        if (drawHeight > target.height) {
-          drawHeight = target.height;
-          drawWidth = static_cast<int>((static_cast<int64_t>(drawHeight) * bitmap.getWidth()) / bitmap.getHeight());
-        }
-        drawWidth = std::max(1, drawWidth);
-        drawHeight = std::max(1, drawHeight);
-        const int drawX = target.x + (target.width - drawWidth) / 2;
-        const int drawY = target.y + (target.height - drawHeight) / 2;
-        rendered = renderer.drawBitmap(bitmap, drawX, drawY, drawWidth, drawHeight);
-        renderer.drawRect(drawX, drawY, drawWidth, drawHeight);
-      }
-      file.close();
-    }
-  }
-  if (!rendered) {
-    renderer.drawRect(target.x, target.y, target.width, target.height);
-    renderer.drawIcon(CoverIcon, target.x + (target.width - 32) / 2, target.y + std::max(4, (target.height - 32) / 2),
-                      32);
-  }
-  return rendered;
 }
 
 void drawTitleLines(const GfxRenderer& renderer, const RecentBook& book, const Rect& rect, const int fontId,
@@ -119,25 +89,92 @@ void drawTitleLines(const GfxRenderer& renderer, const RecentBook& book, const R
   }
 }
 
-void drawPortraitRecents(GfxRenderer& renderer, const VesperHome::Layout& layout,
-                         const std::vector<RecentBook>& recentBooks, const ThemeMetrics& metrics) {
+void drawProgress(const GfxRenderer& renderer, const RecentBook& book, const Rect& text, const int top,
+                  const int bottomLimit) {
+  if (book.progressPercent < 0 || top + 34 >= bottomLimit || text.width < 80) return;
+
+  const int percent = std::clamp(book.progressPercent, 0, 100);
+  char percentText[8];
+  snprintf(percentText, sizeof(percentText), "%d%%", percent);
+  const int percentWidth = renderer.getTextWidth(SMALL_FONT_ID, percentText, EpdFontFamily::BOLD);
+  const int barWidth = std::max(30, text.width - percentWidth - 8);
+  constexpr int barHeight = 8;
+
+  renderer.drawRect(text.x, top, barWidth, barHeight);
+  const int fillWidth = (barWidth - 2) * percent / 100;
+  if (fillWidth > 0) renderer.fillRect(text.x + 1, top + 1, fillWidth, barHeight - 2, true);
+  renderer.drawText(SMALL_FONT_ID, text.x + barWidth + 8, top - 4, percentText, true, EpdFontFamily::BOLD);
+
+  if (book.progressTotal > 0) {
+    char pageText[32];
+    snprintf(pageText, sizeof(pageText), "%lu / %lu", static_cast<unsigned long>(book.progressCurrent),
+             static_cast<unsigned long>(book.progressTotal));
+    renderer.drawText(SMALL_FONT_ID, text.x, top + barHeight + 5, pageText);
+  }
+}
+
+bool drawVesperNavIcon(const GfxRenderer& renderer, const UIIcon icon, const int x, const int y, const int size) {
+  const int cx = x + size / 2;
+  switch (icon) {
+    case UIIcon::Folder: {
+      const int top = y + 7;
+      renderer.drawLine(x + 2, top + 3, x + 9, top + 3, 2, true);
+      renderer.drawLine(x + 9, top + 3, x + 13, top + 7, 2, true);
+      renderer.drawLine(x + 13, top + 7, x + size - 2, top + 7, 2, true);
+      renderer.drawLine(x + 2, top + 3, x + 2, y + size - 3, 2, true);
+      renderer.drawLine(x + 2, y + size - 3, x + size - 2, y + size - 3, 2, true);
+      renderer.drawLine(x + size - 2, top + 7, x + size - 2, y + size - 3, 2, true);
+      return true;
+    }
+    case UIIcon::Library:
+      renderer.drawRect(x + 3, y + 5, 6, size - 9, 2, true);
+      renderer.drawRect(x + 11, y + 3, 6, size - 7, 2, true);
+      renderer.drawRect(x + 19, y + 6, 6, size - 10, 2, true);
+      renderer.drawLine(x + 2, y + size - 2, x + size - 2, y + size - 2, 2, true);
+      return true;
+    case UIIcon::Transfer:
+      renderer.drawLine(cx - 5, y + size - 4, cx - 5, y + 4, 2, true);
+      renderer.drawLine(cx - 5, y + 4, cx - 10, y + 9, 2, true);
+      renderer.drawLine(cx - 5, y + 4, cx, y + 9, 2, true);
+      renderer.drawLine(cx + 5, y + 4, cx + 5, y + size - 4, 2, true);
+      renderer.drawLine(cx + 5, y + size - 4, cx, y + size - 9, 2, true);
+      renderer.drawLine(cx + 5, y + size - 4, cx + 10, y + size - 9, 2, true);
+      return true;
+    case UIIcon::Settings:
+      renderer.drawLine(x + 2, y + 6, x + size - 2, y + 6, 2, true);
+      renderer.fillRect(x + 7, y + 3, 5, 7, true);
+      renderer.drawLine(x + 2, y + 14, x + size - 2, y + 14, 2, true);
+      renderer.fillRect(x + 17, y + 11, 5, 7, true);
+      renderer.drawLine(x + 2, y + 22, x + size - 2, y + 22, 2, true);
+      renderer.fillRect(x + 10, y + 19, 5, 7, true);
+      return true;
+    default:
+      return false;
+  }
+}
+
+void drawPortraitRecents(const GfxRenderer& renderer, const VesperHome::Layout& layout,
+                         const std::vector<RecentBook>& recentBooks) {
   for (int i = 0; i < layout.recentCount; i++) {
     const Rect card = layout.recent[i];
+    const Rect cover = VesperHome::coverRect(layout, i + 1);
+    VesperTheme::drawBookCover(renderer, recentBooks[static_cast<size_t>(i + 1)], cover);
+    renderer.drawRect(cover.x, cover.y, cover.width, cover.height);
+
     constexpr int titleReserve = 42;
-    const Rect cover{card.x + 4, card.y + 2, card.width - 8, std::max(1, card.height - titleReserve - 4)};
-    drawCover(renderer, recentBooks[static_cast<size_t>(i + 1)], cover, metrics.homeCoverHeight);
     const Rect title{card.x + 3, card.y + card.height - titleReserve + 4, card.width - 6, titleReserve - 4};
     drawTitleLines(renderer, recentBooks[static_cast<size_t>(i + 1)], title, SMALL_FONT_ID, 2, false);
   }
 }
 
-void drawLandscapeRecents(GfxRenderer& renderer, const VesperHome::Layout& layout,
-                          const std::vector<RecentBook>& recentBooks, const ThemeMetrics& metrics) {
+void drawLandscapeRecents(const GfxRenderer& renderer, const VesperHome::Layout& layout,
+                          const std::vector<RecentBook>& recentBooks) {
   for (int i = 0; i < layout.recentCount; i++) {
     const Rect card = layout.recent[i];
-    const int coverWidth = std::min(76, card.width * 34 / 100);
-    const Rect cover{card.x + 3, card.y + 3, coverWidth, card.height - 6};
-    drawCover(renderer, recentBooks[static_cast<size_t>(i + 1)], cover, metrics.homeCoverHeight);
+    const Rect cover = VesperHome::coverRect(layout, i + 1);
+    VesperTheme::drawBookCover(renderer, recentBooks[static_cast<size_t>(i + 1)], cover);
+    renderer.drawRect(cover.x, cover.y, cover.width, cover.height);
+
     const int textX = cover.x + cover.width + 10;
     const Rect title{textX, card.y + 10, card.x + card.width - textX - 4, card.height - 16};
     drawTitleLines(renderer, recentBooks[static_cast<size_t>(i + 1)], title, UI_10_FONT_ID, 2, false);
@@ -145,10 +182,43 @@ void drawLandscapeRecents(GfxRenderer& renderer, const VesperHome::Layout& layou
 }
 }  // namespace
 
+bool VesperTheme::drawBookCover(const GfxRenderer& renderer, const RecentBook& book, const Rect target) {
+  if (target.width <= 0 || target.height <= 0 || book.coverBmpPath.empty()) return false;
+
+  const std::string coverPath = UITheme::getCoverThumbPath(book.coverBmpPath, target.height);
+  HalFile file;
+  if (!Storage.openFileForRead("VUI", coverPath, file)) return false;
+
+  Bitmap bitmap(file);
+  if (bitmap.parseHeaders() != BmpReaderError::Ok || bitmap.getWidth() <= 0 || bitmap.getHeight() <= 0) {
+    file.close();
+    return false;
+  }
+
+  const float sourceRatio = static_cast<float>(bitmap.getWidth()) / bitmap.getHeight();
+  const float targetRatio = static_cast<float>(target.width) / target.height;
+  float cropX = 0.0f;
+  float cropY = 0.0f;
+  if (sourceRatio > targetRatio) {
+    cropX = 1.0f - targetRatio / sourceRatio;
+  } else if (sourceRatio < targetRatio) {
+    cropY = 1.0f - sourceRatio / targetRatio;
+  }
+
+  const bool rendered = renderer.drawBitmap(bitmap, target.x, target.y, target.width, target.height, cropX, cropY);
+  file.close();
+  return rendered;
+}
+
 void VesperTheme::drawHeader(const GfxRenderer& renderer, const Rect rect, const char* title,
                              const char* subtitle) const {
   BaseTheme::drawHeader(renderer, rect, title, subtitle);
-  drawVesperLogo(renderer, rect.x + (rect.width - kLogoSize) / 2, rect.y + 1);
+
+  const bool landscape = renderer.getScreenWidth() > renderer.getScreenHeight();
+  const int logoSize = landscape ? 48 : 54;
+  const int logoX = rect.x + (rect.width - logoSize) / 2;
+  const int logoY = rect.y + std::max(0, (rect.height - logoSize) / 2);
+  drawVesperLogo(renderer, logoX, logoY, logoSize);
 }
 
 void VesperTheme::drawRecentBookCover(GfxRenderer& renderer, const Rect rect,
@@ -160,13 +230,18 @@ void VesperTheme::drawRecentBookCover(GfxRenderer& renderer, const Rect rect,
     return;
   }
 
-  const ThemeMetrics& metrics = UITheme::getInstance().getMetrics();
   const VesperHome::Layout layout = VesperHome::bookLayout(rect, static_cast<int>(recentBooks.size()));
 
   if (!bufferRestored) {
     drawSectionLabel(renderer, layout.currentHeading, tr(STR_CONTINUE_READING));
     renderer.drawRect(layout.hero.x, layout.hero.y, layout.hero.width, layout.hero.height);
-    drawCover(renderer, recentBooks[0], layout.heroCover, metrics.homeCoverHeight);
+
+    const Rect heroCover = VesperHome::coverRect(layout, 0);
+    if (!drawBookCover(renderer, recentBooks[0], heroCover)) {
+      renderer.drawIcon(CoverIcon, heroCover.x + (heroCover.width - 32) / 2,
+                        heroCover.y + std::max(4, (heroCover.height - 32) / 2), 32);
+    }
+    renderer.drawRect(heroCover.x, heroCover.y, heroCover.width, heroCover.height);
 
     const RecentBook& current = recentBooks[0];
     const Rect text = layout.heroText;
@@ -174,7 +249,8 @@ void VesperTheme::drawRecentBookCover(GfxRenderer& renderer, const Rect rect,
     drawTitleLines(renderer, current, Rect{text.x, text.y, text.width, titleHeight}, UI_12_FONT_ID, 3, true);
 
     const int authorY = text.y + titleHeight + 6;
-    if (!current.author.empty() && authorY + renderer.getLineHeight(UI_10_FONT_ID) < text.y + text.height) {
+    const int authorLineHeight = renderer.getLineHeight(UI_10_FONT_ID);
+    if (!current.author.empty() && authorY + authorLineHeight < text.y + text.height) {
       const std::string author =
           renderer.truncatedText(UI_10_FONT_ID, current.author.c_str(), text.width, EpdFontFamily::REGULAR);
       renderer.drawText(UI_10_FONT_ID, text.x, authorY, author.c_str());
@@ -182,7 +258,9 @@ void VesperTheme::drawRecentBookCover(GfxRenderer& renderer, const Rect rect,
 
     const int buttonHeight = layout.landscape ? 44 : 48;
     const int buttonY = text.y + text.height - buttonHeight;
-    if (buttonY > authorY + renderer.getLineHeight(UI_10_FONT_ID)) {
+    drawProgress(renderer, current, text, authorY + authorLineHeight + 18, buttonY - 10);
+
+    if (buttonY > authorY + authorLineHeight) {
       renderer.fillRoundedRect(text.x, buttonY, text.width, buttonHeight, 3, Color::Black);
       const char* label = tr(STR_CONTINUE_READING);
       const int labelWidth = renderer.getTextWidth(UI_10_FONT_ID, label, EpdFontFamily::BOLD);
@@ -195,9 +273,9 @@ void VesperTheme::drawRecentBookCover(GfxRenderer& renderer, const Rect rect,
       drawSectionLabel(renderer, layout.recentHeading, tr(STR_MENU_RECENT_BOOKS));
       if (layout.dividerX >= 0) renderer.drawLine(layout.dividerX, rect.y, layout.dividerX, rect.y + rect.height - 1);
       if (layout.landscape)
-        drawLandscapeRecents(renderer, layout, recentBooks, metrics);
+        drawLandscapeRecents(renderer, layout, recentBooks);
       else
-        drawPortraitRecents(renderer, layout, recentBooks, metrics);
+        drawPortraitRecents(renderer, layout, recentBooks);
     }
 
     coverBufferStored = storeCoverBuffer();
@@ -231,8 +309,13 @@ void VesperTheme::drawButtonMenu(GfxRenderer& renderer, const Rect rect, const i
     }
     if (i > 0) renderer.drawLine(item.x, item.y + 8, item.x, item.y + item.height - 8);
 
-    const uint8_t* bitmap = rowIcon ? iconForName(rowIcon(i)) : nullptr;
-    if (bitmap) renderer.drawIcon(bitmap, item.x + (item.width - kNavIconSize) / 2, item.y + 7, kNavIconSize);
+    const UIIcon icon = rowIcon ? rowIcon(i) : UIIcon::None;
+    const int iconX = item.x + (item.width - kNavIconSize) / 2;
+    const int iconY = item.y + 6;
+    if (!drawVesperNavIcon(renderer, icon, iconX, iconY, kNavIconSize)) {
+      const uint8_t* bitmap = iconForName(icon);
+      if (bitmap) renderer.drawIcon(bitmap, iconX, iconY, kNavIconSize);
+    }
 
     const std::string raw = buttonLabel(i);
     const std::string label =

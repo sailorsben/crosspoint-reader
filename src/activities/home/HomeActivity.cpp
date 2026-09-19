@@ -21,6 +21,7 @@
 #include "RecentBooksStore.h"
 #include "components/UITheme.h"
 #include "components/themes/vesper/VesperHomeLayout.h"
+#include "components/themes/vesper/VesperTheme.h"
 #include "fontIds.h"
 
 int HomeActivity::getMenuItemCount() const {
@@ -52,6 +53,40 @@ void HomeActivity::loadRecentBooks(int maxBooks) {
 
     recentBooks.push_back(book);
   }
+
+  if (SETTINGS.uiTheme == CrossPointSettings::UI_THEME::VESPERUI && !recentBooks.empty()) {
+    loadVesperProgress(recentBooks.front());
+  }
+}
+
+void HomeActivity::loadVesperProgress(RecentBook& book) {
+  book.progressPercent = -1;
+  book.progressCurrent = 0;
+  book.progressTotal = 0;
+  if (!FsHelpers::hasXtcExtension(book.path)) return;
+
+  Xtc xtc(book.path, "/.crosspoint");
+  if (!xtc.load()) return;
+
+  const uint32_t total = xtc.getPageCount();
+  if (total == 0) return;
+
+  uint32_t current = 0;
+  HalFile progress;
+  const std::string progressPath = xtc.getCachePath() + "/progress.bin";
+  if (Storage.openFileForRead("HOME", progressPath, progress)) {
+    uint8_t bytes[4] = {};
+    if (progress.read(bytes, sizeof(bytes)) == static_cast<int>(sizeof(bytes))) {
+      current = static_cast<uint32_t>(bytes[0]) | (static_cast<uint32_t>(bytes[1]) << 8) |
+                (static_cast<uint32_t>(bytes[2]) << 16) | (static_cast<uint32_t>(bytes[3]) << 24);
+    }
+    progress.close();
+  }
+  current = std::min(current, total - 1);
+
+  book.progressCurrent = current + 1;
+  book.progressTotal = total;
+  book.progressPercent = static_cast<int>(xtc.calculateProgress(current));
 }
 
 void HomeActivity::loadRecentCovers(int coverHeight) {
@@ -60,6 +95,66 @@ void HomeActivity::loadRecentCovers(int coverHeight) {
   Rect popupRect;
 
   int progress = 0;
+
+  if (SETTINGS.uiTheme == CrossPointSettings::UI_THEME::VESPERUI) {
+    const auto& metrics = UITheme::getInstance().getMetrics();
+    const Rect band{0, metrics.homeTopPadding, renderer.getScreenWidth(), metrics.homeCoverTileHeight};
+    const auto layout = VesperHome::bookLayout(band, static_cast<int>(recentBooks.size()));
+
+    for (size_t i = 0; i < recentBooks.size(); i++) {
+      RecentBook& book = recentBooks[i];
+      const Rect target = VesperHome::coverRect(layout, static_cast<int>(i));
+      if (target.width <= 0 || target.height <= 0) continue;
+
+      const std::string fallbackPath = book.coverBmpPath;
+      std::string grayPath;
+      bool ready = false;
+
+      if (FsHelpers::hasEpubExtension(book.path)) {
+        Epub epub(book.path, "/.crosspoint");
+        if (epub.load(false, true)) {
+          grayPath = epub.getVesperThumbBmpPath(target.width, target.height);
+          ready = Storage.exists(grayPath.c_str());
+          if (!ready) {
+            if (!showingLoading) {
+              showingLoading = true;
+              popupRect = GUI.drawPopup(renderer, tr(STR_LOADING_POPUP));
+            }
+            GUI.fillPopupProgress(renderer, popupRect, 10 + progress * (90 / std::max<size_t>(1, recentBooks.size())));
+            ready = epub.generateVesperThumbBmp(target.width, target.height);
+          }
+        }
+      } else if (FsHelpers::hasXtcExtension(book.path)) {
+        Xtc xtc(book.path, "/.crosspoint");
+        if (xtc.load()) {
+          grayPath = xtc.getVesperThumbBmpPath(target.width, target.height);
+          ready = Storage.exists(grayPath.c_str());
+          if (!ready) {
+            if (!showingLoading) {
+              showingLoading = true;
+              popupRect = GUI.drawPopup(renderer, tr(STR_LOADING_POPUP));
+            }
+            GUI.fillPopupProgress(renderer, popupRect, 10 + progress * (90 / std::max<size_t>(1, recentBooks.size())));
+            ready = xtc.generateVesperThumbBmp(target.width, target.height);
+          }
+        }
+      }
+
+      book.coverBmpPath = ready ? grayPath : fallbackPath;
+      progress++;
+    }
+
+    // Any old snapshot contains the 1-bit placeholders. Force a fresh static
+    // Vesper frame before the grayscale plane pass.
+    freeCoverBuffer();
+    coverRendered = false;
+    vesperGrayCoversOnPanel = false;
+    recentsLoaded = true;
+    recentsLoading = false;
+    requestUpdate();
+    return;
+  }
+
   for (RecentBook& book : recentBooks) {
     if (!book.coverBmpPath.empty()) {
       std::string coverPath = UITheme::getCoverThumbPath(book.coverBmpPath, coverHeight);
@@ -114,6 +209,7 @@ void HomeActivity::loadRecentCovers(int coverHeight) {
 void HomeActivity::onEnter() {
   Activity::onEnter();
 
+  vesperGrayCoversOnPanel = false;
   hasOpdsServers = OPDS_STORE.hasServers();
 
   const auto& metrics = UITheme::getInstance().getMetrics();
@@ -129,6 +225,7 @@ void HomeActivity::onEnter() {
 void HomeActivity::onExit() {
   Activity::onExit();
 
+  vesperGrayCoversOnPanel = false;
   // Free the stored cover buffer if any
   freeCoverBuffer();
 }
@@ -167,6 +264,59 @@ void HomeActivity::freeCoverBuffer() {
   }
   coverBufferSize = 0;
   coverBufferStored = false;
+}
+
+bool HomeActivity::drawVesperCoverArt() {
+  if (recentBooks.empty()) return false;
+  const auto& metrics = UITheme::getInstance().getMetrics();
+  const Rect band{0, metrics.homeTopPadding, renderer.getScreenWidth(), metrics.homeCoverTileHeight};
+  const auto layout = VesperHome::bookLayout(band, static_cast<int>(recentBooks.size()));
+
+  bool any = false;
+  for (size_t i = 0; i < recentBooks.size(); i++) {
+    const Rect target = VesperHome::coverRect(layout, static_cast<int>(i));
+    any |= VesperTheme::drawBookCover(renderer, recentBooks[i], target);
+  }
+  return any;
+}
+
+void HomeActivity::renderVesperGrayCovers() {
+  if (vesperGrayCoversOnPanel || recentBooks.empty()) return;
+
+  const bool graySupported =
+      renderer.grayscaleCapabilities(HalDisplay::GrayscaleMode::Direct).supported() ||
+      renderer.grayscaleCapabilities(HalDisplay::GrayscaleMode::Absolute).supported();
+  if (!graySupported) return;
+
+  // Free the regional snapshot first so the full BW store has headroom.
+  freeCoverBuffer();
+  if (!renderer.storeBwBuffer()) {
+    LOG_ERR("HOME", "OOM: VesperUI grayscale cover framebuffer store");
+    return;
+  }
+
+  renderer.displayGrayscaleBase(HalDisplay::HALF_REFRESH);
+
+  renderer.clearScreen(0x00);
+  renderer.setRenderMode(GfxRenderer::GRAYSCALE_LSB);
+  if (!drawVesperCoverArt()) {
+    renderer.setRenderMode(GfxRenderer::BW);
+    renderer.restoreBwBuffer();
+    renderer.cleanupGrayscaleWithFrameBuffer();
+    return;
+  }
+  renderer.copyGrayscaleLsbBuffers();
+
+  renderer.clearScreen(0x00);
+  renderer.setRenderMode(GfxRenderer::GRAYSCALE_MSB);
+  drawVesperCoverArt();
+  renderer.copyGrayscaleMsbBuffers();
+
+  renderer.displayGrayBuffer();
+  renderer.setRenderMode(GfxRenderer::BW);
+  renderer.restoreBwBuffer();
+  renderer.cleanupGrayscaleWithFrameBuffer();
+  vesperGrayCoversOnPanel = true;
 }
 
 void HomeActivity::loop() {
@@ -324,16 +474,23 @@ void HomeActivity::render(RenderLock&&) {
   // Band spans topPadding..homeTopPadding: the cover tile starts at the fixed
   // homeTopPadding, so the height must shrink by topPadding or the band (and a
   // centered title, e.g. RoundedRaff's book title) sinks into the tile.
+  const char* homeTitle =
+      SETTINGS.uiTheme == CrossPointSettings::UI_THEME::VESPERUI
+          ? tr(STR_HOME_SHORTCUT)
+          : (metrics.homeContinueReadingInMenu && !recentBooks.empty() ? recentBooks[0].title.c_str() : nullptr);
   GUI.drawHeader(renderer, Rect{0, metrics.topPadding, pageWidth, metrics.homeTopPadding - metrics.topPadding},
-                 metrics.homeContinueReadingInMenu && !recentBooks.empty() ? recentBooks[0].title.c_str() : nullptr);
+                 homeTitle);
 
   // Record the tile rect so storeCoverBuffer (called from the theme) knows
   // which sub-region of the framebuffer to snapshot. ~16 KB in Portrait
   // instead of the 48 KB full framebuffer the previous bind captured.
+  const bool coverGeometryChanged = coverRectX != 0 || coverRectY != metrics.homeTopPadding || coverRectW != pageWidth ||
+                                    coverRectH != metrics.homeCoverTileHeight;
   coverRectX = 0;
   coverRectY = metrics.homeTopPadding;
   coverRectW = pageWidth;
   coverRectH = metrics.homeCoverTileHeight;
+  if (coverGeometryChanged) vesperGrayCoversOnPanel = false;
 
   GUI.drawRecentBookCover(renderer, Rect{0, metrics.homeTopPadding, pageWidth, metrics.homeCoverTileHeight},
                           recentBooks, selectorIndex, coverRendered, coverBufferStored, bufferRestored,
@@ -370,6 +527,10 @@ void HomeActivity::render(RenderLock&&) {
   GUI.drawButtonHints(renderer, labels.btn1, labels.btn2, labels.btn3, labels.btn4);
 
   renderer.displayBuffer(cleanInitialRefresh && !firstRenderDone ? HalDisplay::HALF_REFRESH : HalDisplay::FAST_REFRESH);
+
+  if (SETTINGS.uiTheme == CrossPointSettings::UI_THEME::VESPERUI && recentsLoaded && !recentsLoading) {
+    renderVesperGrayCovers();
+  }
 
   if (!firstRenderDone) {
     firstRenderDone = true;

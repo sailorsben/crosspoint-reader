@@ -732,3 +732,8 @@ bool JpegToBmpConverter::jpegFileTo1BitBmpStreamWithSize(HalFile& jpegFile, Prin
                                                          int targetMaxHeight) {
   return jpegFileToBmpStreamInternal(jpegFile, bmpOut, targetMaxWidth, targetMaxHeight, true, true);
 }
+
+bool JpegToBmpConverter::jpegFileToVesperThumbBmpStreamWithSize(HalFile& jpegFile, Print& bmpOut,
+                                                                const int targetWidth, const int targetHeight) {
+  return jpegFileToBmpStreamInternal(jpegFile, bmpOut, targetWidth, targetHeight, false, true, true);
+}

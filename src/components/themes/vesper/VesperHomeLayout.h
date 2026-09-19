@@ -72,6 +72,22 @@ inline Layout bookLayout(const Rect band, const int bookCount) {
   return l;
 }
 
+inline Rect coverRect(const Layout& l, const int bookIndex) {
+  if (bookIndex == 0) return l.heroCover;
+  const int recentIndex = bookIndex - 1;
+  if (recentIndex < 0 || recentIndex >= l.recentCount) return {};
+
+  const Rect card = l.recent[recentIndex];
+  if (l.landscape) {
+    const int coverWidth = std::min(76, card.width * 34 / 100);
+    return Rect{card.x + 3, card.y + 3, coverWidth, std::max(1, card.height - 6)};
+  }
+
+  constexpr int titleReserve = 42;
+  return Rect{card.x + 4, card.y + 2, std::max(1, card.width - 8),
+              std::max(1, card.height - titleReserve - 4)};
+}
+
 inline int hitBook(const Layout& l, const int bookCount, const int x, const int y) {
   if (bookCount > 0 && contains(l.hero, x, y)) return 0;
   for (int i = 0; i < l.recentCount; i++) {

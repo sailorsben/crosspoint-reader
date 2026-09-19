@@ -487,6 +487,129 @@ bool Xtc::generateThumbBmp(int height) const {
   return true;
 }
 
+
+std::string Xtc::getVesperThumbBmpPath(const int width, const int height) const {
+  return cachePath + "/thumb_vui2_" + std::to_string(width) + "x" + std::to_string(height) + ".bmp";
+}
+
+bool Xtc::generateVesperThumbBmp(const int targetWidth, const int targetHeight) const {
+  if (targetWidth <= 0 || targetHeight <= 0 || !loaded || !parser || parser->getPageCount() == 0) return false;
+
+  const std::string outputPath = getVesperThumbBmpPath(targetWidth, targetHeight);
+  if (Storage.exists(outputPath.c_str())) return true;
+  setupCacheDir();
+
+  xtc::PageInfo pageInfo;
+  if (!parser->getPageInfo(0, pageInfo) || pageInfo.width == 0 || pageInfo.height == 0) return false;
+
+  const uint8_t bitDepth = parser->getBitDepth();
+  size_t bitmapSize;
+  if (bitDepth == 2) {
+    bitmapSize = static_cast<size_t>(pageInfo.width) * ((static_cast<size_t>(pageInfo.height) + 7) / 8) * 2;
+  } else {
+    bitmapSize = ((static_cast<size_t>(pageInfo.width) + 7) / 8) * pageInfo.height;
+  }
+
+  const uint32_t rowSize = (static_cast<uint32_t>(targetWidth) * 2 + 31) / 32 * 4;
+  auto scratch = makeUniqueNoThrow<uint8_t[]>(bitmapSize + rowSize);
+  if (!scratch) {
+    LOG_ERR("XTC", "OOM: VesperUI thumb buffers (%lu bytes)",
+            static_cast<unsigned long>(bitmapSize + rowSize));
+    return false;
+  }
+  uint8_t* pageBuffer = scratch.get();
+  uint8_t* rowBuffer = scratch.get() + bitmapSize;
+  if (const_cast<xtc::XtcParser*>(parser.get())->loadPage(0, pageBuffer, bitmapSize) == 0) return false;
+
+  // Center-crop the source to the exact target aspect ratio.
+  uint32_t cropX = 0;
+  uint32_t cropY = 0;
+  uint32_t cropW = pageInfo.width;
+  uint32_t cropH = pageInfo.height;
+  if (static_cast<uint64_t>(pageInfo.width) * targetHeight >
+      static_cast<uint64_t>(pageInfo.height) * targetWidth) {
+    cropW = std::max<uint32_t>(1, static_cast<uint32_t>(
+                                      static_cast<uint64_t>(pageInfo.height) * targetWidth / targetHeight));
+    cropX = (pageInfo.width - cropW) / 2;
+  } else {
+    cropH = std::max<uint32_t>(1, static_cast<uint32_t>(
+                                      static_cast<uint64_t>(pageInfo.width) * targetHeight / targetWidth));
+    cropY = (pageInfo.height - cropH) / 2;
+  }
+
+  HalFile thumb;
+  if (!Storage.openFileForWrite("XTC", outputPath, thumb)) return false;
+
+  // 2-bit top-down BMP: black, dark gray, light gray, white.
+  uint8_t header[70] = {
+      'B', 'M', 0, 0, 0, 0, 0, 0, 0, 0, 70, 0, 0, 0, 40, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 2, 0,
+      0,   0,   0, 0, 0, 0, 0, 0, 0x13, 0x0B, 0, 0, 0x13, 0x0B, 0, 0, 4, 0, 0, 0, 4, 0, 0, 0,
+      0x00, 0x00, 0x00, 0x00, 0x55, 0x55, 0x55, 0x00, 0xAA, 0xAA, 0xAA, 0x00, 0xFF, 0xFF, 0xFF, 0x00};
+  const uint32_t imageSize = rowSize * static_cast<uint32_t>(targetHeight);
+  const uint32_t fileSize = sizeof(header) + imageSize;
+  const int32_t topDownHeight = -targetHeight;
+  memcpy(header + 2, &fileSize, 4);
+  memcpy(header + 18, &targetWidth, 4);
+  memcpy(header + 22, &topDownHeight, 4);
+  memcpy(header + 34, &imageSize, 4);
+  thumb.write(header, sizeof(header));
+
+  const size_t colBytes = bitDepth == 2 ? (pageInfo.height + 7) / 8 : 0;
+  const size_t planeSize = bitDepth == 2 ? static_cast<size_t>(pageInfo.width) * colBytes : 0;
+  const uint8_t* plane1 = bitDepth == 2 ? pageBuffer : nullptr;
+  const uint8_t* plane2 = bitDepth == 2 ? pageBuffer + planeSize : nullptr;
+  const size_t srcRowBytes = bitDepth == 1 ? (pageInfo.width + 7) / 8 : 0;
+  uint8_t rowsSinceYield = 0;
+
+  for (int dstY = 0; dstY < targetHeight; dstY++) {
+    memset(rowBuffer, 0, rowSize);
+    uint32_t srcY0 = cropY + static_cast<uint64_t>(dstY) * cropH / targetHeight;
+    uint32_t srcY1 = cropY + static_cast<uint64_t>(dstY + 1) * cropH / targetHeight;
+    srcY1 = std::max(srcY0 + 1, std::min<uint32_t>(cropY + cropH, srcY1));
+
+    for (int dstX = 0; dstX < targetWidth; dstX++) {
+      uint32_t srcX0 = cropX + static_cast<uint64_t>(dstX) * cropW / targetWidth;
+      uint32_t srcX1 = cropX + static_cast<uint64_t>(dstX + 1) * cropW / targetWidth;
+      srcX1 = std::max(srcX0 + 1, std::min<uint32_t>(cropX + cropW, srcX1));
+
+      uint32_t sum = 0;
+      uint32_t count = 0;
+      for (uint32_t sy = srcY0; sy < srcY1; sy++) {
+        for (uint32_t sx = srcX0; sx < srcX1; sx++) {
+          uint8_t gray = 255;
+          if (bitDepth == 2) {
+            const size_t colIndex = pageInfo.width - 1 - sx;
+            const size_t byteOffset = colIndex * colBytes + sy / 8;
+            const uint8_t shift = 7 - (sy % 8);
+            const uint8_t value = (((plane1[byteOffset] >> shift) & 1) << 1) |
+                                  ((plane2[byteOffset] >> shift) & 1);
+            static constexpr uint8_t XTH_GRAY[4] = {255, 85, 170, 0};
+            gray = XTH_GRAY[value];
+          } else {
+            const size_t byteOffset = static_cast<size_t>(sy) * srcRowBytes + sx / 8;
+            gray = ((pageBuffer[byteOffset] >> (7 - (sx % 8))) & 1) ? 255 : 0;
+          }
+          sum += gray;
+          count++;
+        }
+      }
+
+      // Slight lift prevents dark fantasy covers from collapsing into ink.
+      const int average = count ? static_cast<int>(sum / count) : 255;
+      const int lifted = std::min(255, average + 10);
+      const uint8_t level = lifted < 64 ? 0 : lifted < 128 ? 1 : lifted < 192 ? 2 : 3;
+      rowBuffer[(dstX * 2) / 8] |= level << (6 - ((dstX * 2) % 8));
+    }
+
+    thumb.write(rowBuffer, rowSize);
+    yieldDuringThumbnail(rowsSinceYield);
+  }
+
+  thumb.close();
+  LOG_DBG("XTC", "Generated VesperUI gray thumb %dx%d: %s", targetWidth, targetHeight, outputPath.c_str());
+  return true;
+}
+
 uint32_t Xtc::getPageCount() const {
   if (!loaded || !parser) {
     return 0;

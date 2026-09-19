@@ -99,8 +99,7 @@ const fui::KeyboardKey URL_SNIP_BOTTOM[] = {UKS("abc", fui::KeyKind::Mode, fui::
 const fui::KeyboardKey NUMBER_ROW1[] = {UK("1", "1", '1'), UK("2", "2", '2'), UK("3", "3", '3')};
 const fui::KeyboardKey NUMBER_ROW2[] = {UK("4", "4", '4'), UK("5", "5", '5'), UK("6", "6", '6')};
 const fui::KeyboardKey NUMBER_ROW3[] = {UK("7", "7", '7'), UK("8", "8", '8'), UK("9", "9", '9')};
-const fui::KeyboardKey NUMBER_BOTTOM[] = {UK("0", "0", '0'),
-                                          UKS("OK", fui::KeyKind::Ok, fui::QWERTY_KEY_ENTER, 1),
+const fui::KeyboardKey NUMBER_BOTTOM[] = {UK("0", "0", '0'), UKS("OK", fui::KeyKind::Ok, fui::QWERTY_KEY_ENTER, 1),
                                           UKS("Del", fui::KeyKind::Delete, fui::QWERTY_KEY_BACKSPACE, 1)};
 
 #undef UK
