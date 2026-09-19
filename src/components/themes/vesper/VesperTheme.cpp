@@ -106,8 +106,8 @@ void drawProgress(const GfxRenderer& renderer, const RecentBook& book, const Rec
   renderer.drawText(SMALL_FONT_ID, text.x + barWidth + 8, top - 4, percentText, true, EpdFontFamily::BOLD);
 
   if (book.progressTotal > 0) {
-    char pageText[32];
-    snprintf(pageText, sizeof(pageText), "%lu / %lu", static_cast<unsigned long>(book.progressCurrent),
+    char pageText[40];
+    snprintf(pageText, sizeof(pageText), "Page %lu / %lu", static_cast<unsigned long>(book.progressCurrent),
              static_cast<unsigned long>(book.progressTotal));
     renderer.drawText(SMALL_FONT_ID, text.x, top + barHeight + 5, pageText);
   }
