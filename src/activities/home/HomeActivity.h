@@ -73,7 +73,7 @@ class HomeActivity final : public Activity {
   void promoteRecentToHero(int index);
   void loadVesperProgress(RecentBook& book);
   bool drawVesperCoverArt();
-  void renderVesperGrayCovers();
+  bool renderVesperGrayCovers(HalDisplay::RefreshMode baseRefresh);
 
  public:
   explicit HomeActivity(GfxRenderer& renderer, MappedInputManager& mappedInput,

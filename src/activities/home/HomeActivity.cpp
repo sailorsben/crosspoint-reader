@@ -297,21 +297,60 @@ bool HomeActivity::drawVesperCoverArt() {
   return any;
 }
 
-void HomeActivity::renderVesperGrayCovers() {
-  if (vesperGrayCoversOnPanel || recentBooks.empty()) return;
+bool HomeActivity::renderVesperGrayCovers(const HalDisplay::RefreshMode baseRefresh) {
+  if (vesperGrayCoversOnPanel || recentBooks.empty()) return false;
 
-  const bool graySupported = renderer.grayscaleCapabilities(HalDisplay::GrayscaleMode::Direct).supported() ||
-                             renderer.grayscaleCapabilities(HalDisplay::GrayscaleMode::Absolute).supported();
-  if (!graySupported) return;
-
-  // Free the regional snapshot first so the full BW store has headroom.
-  freeCoverBuffer();
-  if (!renderer.storeBwBuffer()) {
-    LOG_ERR("HOME", "OOM: VesperUI grayscale cover framebuffer store");
-    return;
+  // Prefer a combined absolute pass: base + both gray planes are staged first
+  // and the panel activates only once. X4 Pro supports Direct on compatible
+  // panel revisions; SSD1677-style panels may expose Absolute as Combined.
+  HalDisplay::GrayscaleMode mode = HalDisplay::GrayscaleMode::Direct;
+  auto caps = renderer.grayscaleCapabilities(mode);
+  if (!caps.supported() || caps.base != HalDisplay::GrayscaleBase::Combined) {
+    mode = HalDisplay::GrayscaleMode::Absolute;
+    caps = renderer.grayscaleCapabilities(mode);
   }
 
-  renderer.displayGrayscaleBase(HalDisplay::HALF_REFRESH);
+  const bool combined = caps.supported() && caps.base == HalDisplay::GrayscaleBase::Combined;
+  if (combined && coverBufferStored && coverBuffer) {
+    if (!renderer.displayGrayscaleBase(mode, baseRefresh)) return false;
+
+    // Absolute planes must include the B/W UI outside the covers. Start each
+    // plane from the already-rendered B/W framebuffer and only replace the
+    // cover pixels with their 2-bit levels.
+    renderer.copyBufferToRegion(coverRectX, coverRectY, coverRectW, coverRectH, coverBuffer, coverBufferSize);
+    renderer.setRenderMode(GfxRenderer::GRAYSCALE_LSB);
+    if (!drawVesperCoverArt()) {
+      renderer.setRenderMode(GfxRenderer::BW);
+      renderer.copyBufferToRegion(coverRectX, coverRectY, coverRectW, coverRectH, coverBuffer, coverBufferSize);
+      return false;
+    }
+    renderer.copyGrayscaleLsbBuffers();
+
+    renderer.copyBufferToRegion(coverRectX, coverRectY, coverRectW, coverRectH, coverBuffer, coverBufferSize);
+    renderer.setRenderMode(GfxRenderer::GRAYSCALE_MSB);
+    drawVesperCoverArt();
+    renderer.copyGrayscaleMsbBuffers();
+
+    renderer.displayGrayBuffer();
+    renderer.setRenderMode(GfxRenderer::BW);
+    renderer.copyBufferToRegion(coverRectX, coverRectY, coverRectW, coverRectH, coverBuffer, coverBufferSize);
+    renderer.cleanupGrayscaleWithFrameBuffer();
+    vesperGrayCoversOnPanel = true;
+    return true;
+  }
+
+  // Compatibility fallback for panels without a combined absolute/direct
+  // waveform. This is still one fewer visible Home rewrite than before:
+  // displayGrayscaleBase() is the only B/W base activation.
+  const auto overlayCaps = renderer.grayscaleCapabilities(HalDisplay::GrayscaleMode::Overlay);
+  if (!overlayCaps.supported()) return false;
+
+  if (!renderer.storeBwBuffer()) {
+    LOG_ERR("HOME", "OOM: VesperUI grayscale cover framebuffer store");
+    return false;
+  }
+
+  renderer.displayGrayscaleBase(baseRefresh);
 
   renderer.clearScreen(0x00);
   renderer.setRenderMode(GfxRenderer::GRAYSCALE_LSB);
@@ -319,7 +358,7 @@ void HomeActivity::renderVesperGrayCovers() {
     renderer.setRenderMode(GfxRenderer::BW);
     renderer.restoreBwBuffer();
     renderer.cleanupGrayscaleWithFrameBuffer();
-    return;
+    return true;
   }
   renderer.copyGrayscaleLsbBuffers();
 
@@ -333,32 +372,12 @@ void HomeActivity::renderVesperGrayCovers() {
   renderer.restoreBwBuffer();
   renderer.cleanupGrayscaleWithFrameBuffer();
   vesperGrayCoversOnPanel = true;
+  return true;
 }
 
 void HomeActivity::loop() {
   const int menuCount = getMenuItemCount();
   const auto& metrics = UITheme::getInstance().getMetrics();
-
-  if (SETTINGS.uiTheme == CrossPointSettings::UI_THEME::VESPERUI) {
-    int longX = 0;
-    int longY = 0;
-    if (mappedInput.wasScreenLongPress(longX, longY)) {
-      SETTINGS.interfaceOrientation =
-          SETTINGS.interfaceOrientation == CrossPointSettings::UI_PORTRAIT
-              ? CrossPointSettings::UI_LANDSCAPE_CW
-              : CrossPointSettings::UI_PORTRAIT;
-      SETTINGS.saveToFile();
-
-      freeCoverBuffer();
-      coverRendered = false;
-      vesperGrayCoversOnPanel = false;
-      recentsLoaded = false;
-      recentsLoading = false;
-      applyDisplayOrientation();
-      requestUpdate();
-      return;
-    }
-  }
 
   auto activateSelection = [this] {
     if (selectorIndex < static_cast<int>(recentBooks.size())) {
@@ -567,11 +586,13 @@ void HomeActivity::render(RenderLock&&) {
                                             tr(STR_DIR_DOWN));
   GUI.drawButtonHints(renderer, labels.btn1, labels.btn2, labels.btn3, labels.btn4);
 
-  renderer.displayBuffer(cleanInitialRefresh && !firstRenderDone ? HalDisplay::HALF_REFRESH : HalDisplay::FAST_REFRESH);
-
+  const HalDisplay::RefreshMode homeRefresh =
+      cleanInitialRefresh && !firstRenderDone ? HalDisplay::HALF_REFRESH : HalDisplay::FAST_REFRESH;
+  bool displayed = false;
   if (SETTINGS.uiTheme == CrossPointSettings::UI_THEME::VESPERUI && recentsLoaded && !recentsLoading) {
-    renderVesperGrayCovers();
+    displayed = renderVesperGrayCovers(homeRefresh);
   }
+  if (!displayed) renderer.displayBuffer(homeRefresh);
 
   if (!firstRenderDone) {
     firstRenderDone = true;

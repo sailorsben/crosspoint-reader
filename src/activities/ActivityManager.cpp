@@ -92,6 +92,23 @@ void ActivityManager::loop() {
 
   if (currentActivity) {
     currentActivity->applyDisplayOrientation();
+
+    if (mappedInput.homeButtonAction() == HomeButtonAction::ToggleInterfaceOrientation) {
+      SETTINGS.interfaceOrientation =
+          SETTINGS.interfaceOrientation == CrossPointSettings::UI_PORTRAIT
+              ? CrossPointSettings::UI_LANDSCAPE_CW
+              : CrossPointSettings::UI_PORTRAIT;
+      SETTINGS.saveToFile();
+
+      // Reader pages own their own orientation. The setting still changes now
+      // so the next menu/sleep screen uses it, but don't repaint the book.
+      if (!currentActivity->isReaderActivity()) {
+        currentActivity->applyDisplayOrientation();
+        requestUpdate();
+      }
+      return;
+    }
+
     if (!currentActivity->isHomeActivity() && mappedInput.wasHomeGesture()) {
       if (currentActivity->handleHomeGesture()) {
         return;
