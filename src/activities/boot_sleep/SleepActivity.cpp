@@ -530,17 +530,20 @@ void SleepActivity::onEnter() {
     }
     drawSleepPopupPreservingFrame(renderer);
     if (APP_STATE.lastSleepFromReader) {
-      renderer.setOrientation(GfxRenderer::Orientation::Portrait);
+      // The overlay belongs to VesperUI, not the book. Restore the interface
+      // orientation after showing the reader-oriented sleep transition.
+      Activity::applyDisplayOrientation();
     }
     releaseSdFontCachesForDecode(renderer);
     return renderTransparentCustomSleepScreen();
   }
 
-  // Show popup with reader orientation only when going to sleep from reader
+  // Show the transition in reader orientation when sleeping from a book, then
+  // return to VesperUI's interface orientation for the actual sleep screen.
   if (APP_STATE.lastSleepFromReader) {
     ReaderUtils::applyOrientation(renderer, SETTINGS.orientation);
     GUI.drawPopup(renderer, tr(STR_ENTERING_SLEEP));
-    renderer.setOrientation(GfxRenderer::Orientation::Portrait);
+    Activity::applyDisplayOrientation();
   } else {
     GUI.drawPopup(renderer, tr(STR_ENTERING_SLEEP));
   }
@@ -564,17 +567,22 @@ void SleepActivity::onEnter() {
 }
 
 void SleepActivity::renderCustomSleepScreen() const {
-  // Look for sleep.bmp on the root of the sd card to determine if we should
-  // render a custom sleep screen instead of the default.
-  // This takes priority over the /sleep folder.
-  HalFile file;
-  if (Storage.openFileForRead("SLP", "/sleep.bmp", file)) {
+  // VesperUI supports separate assets for each interface orientation. This
+  // avoids rotating/cropping a portrait wallpaper when the UI is landscape.
+  const bool landscape = renderer.getScreenWidth() > renderer.getScreenHeight();
+  const char* orientedPath = landscape ? "/sleep-landscape.bmp" : "/sleep-portrait.bmp";
+  const char* rootCandidates[] = {orientedPath, "/sleep.bmp"};
+
+  for (const char* path : rootCandidates) {
+    HalFile file;
+    if (!Storage.openFileForRead("SLP", path, file)) continue;
+
     Bitmap bitmap(file, true,
                   renderer.grayscaleCapabilities(sleepGrayscaleMode(renderer)).supported() &&
                       display.getController() == HalDisplay::Controller::SSD1677 &&
                       SETTINGS.sleepScreenCoverFilter == CrossPointSettings::SLEEP_SCREEN_COVER_FILTER::NO_FILTER);
     if (bitmap.parseHeaders() == BmpReaderError::Ok) {
-      LOG_DBG("SLP", "Loading: /sleep.bmp");
+      LOG_DBG("SLP", "Loading: %s", path);
       renderBitmapSleepScreen(bitmap);
       file.close();
       return;
