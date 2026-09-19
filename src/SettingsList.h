@@ -309,8 +309,7 @@ inline std::vector<SettingInfo> getSettingsList(const SdCardFontRegistry* regist
             "touchReaderControls", StrId::STR_CAT_CONTROLS),
         SettingInfo::Enum(
             StrId::STR_XTC_TAP_PROFILE, &CrossPointSettings::xtcTapProfile,
-            {StrId::STR_PORTRAIT, StrId::STR_LANDSCAPE_CW, StrId::STR_ORIENTATION_INVERTED,
-             StrId::STR_LANDSCAPE_CCW},
+            {StrId::STR_PORTRAIT, StrId::STR_LANDSCAPE_CW, StrId::STR_ORIENTATION_INVERTED, StrId::STR_LANDSCAPE_CCW},
             "xtcTapProfile", StrId::STR_CAT_CONTROLS),
         // Persisted under the legacy "tapForReaderMenu" key: old saves map
         // 0 = Off, 1 = Tap.
