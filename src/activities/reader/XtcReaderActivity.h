@@ -39,6 +39,7 @@ class XtcReaderActivity final : public ReaderActivity {
   std::string getBookThumbBmpPath() const override { return xtc ? xtc->getThumbBmpPath() : ""; }
   bool handleFormatInput() override;
   void renderBook() override;
+  void applyDisplayOrientation() override;
   void applyInitialOrientation() override;
   GfxRenderer::Orientation tapInputOrientation() const override;
 

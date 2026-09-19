@@ -10,6 +10,7 @@
 
 namespace {
 constexpr int PAGE_TURN_RATES[] = {0, 1, 3, 6, 12};
+constexpr size_t PAGE_TURN_RATE_COUNT = sizeof(PAGE_TURN_RATES) / sizeof(PAGE_TURN_RATES[0]);
 }
 
 #include "CrossPointSettings.h"
@@ -159,7 +160,7 @@ void XtcReaderActivity::onReaderMenuConfirm(const XtcReaderMenuActivity::MenuAct
 
 void XtcReaderActivity::toggleAutoPageTurn(const uint8_t option) {
   selectedPageTurnOption = option;
-  if (option == 0 || option >= std::size(PAGE_TURN_RATES) || PAGE_TURN_RATES[option] <= 0) {
+  if (option == 0 || option >= PAGE_TURN_RATE_COUNT || PAGE_TURN_RATES[option] <= 0) {
     automaticPageTurnActive = false;
     pageTurnDuration = 0;
     return;
@@ -168,6 +169,8 @@ void XtcReaderActivity::toggleAutoPageTurn(const uint8_t option) {
   lastPageTurnTime = millis();
   automaticPageTurnActive = true;
 }
+
+void XtcReaderActivity::applyDisplayOrientation() { renderer.setOrientation(GfxRenderer::Orientation::Portrait); }
 
 void XtcReaderActivity::applyInitialOrientation() { renderer.setOrientation(GfxRenderer::Orientation::Portrait); }
 

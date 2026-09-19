@@ -46,7 +46,12 @@ void ReaderActivity::applyInitialOrientation() { ReaderUtils::applyOrientation(r
 
 void ReaderActivity::disableFastInitialRefresh() { pagesUntilFullRefresh = 0; }
 
-void ReaderActivity::applyDisplayOrientation() { applyInitialOrientation(); }
+void ReaderActivity::applyDisplayOrientation() {
+  // Restore the reader's persisted screen transform without touching format-
+  // specific layout bookkeeping (EPUB uses appliedOrientation to decide when
+  // it must actually reflow).
+  ReaderUtils::applyOrientation(renderer, SETTINGS.orientation);
+}
 
 void ReaderActivity::onEnter() {
   Activity::onEnter();

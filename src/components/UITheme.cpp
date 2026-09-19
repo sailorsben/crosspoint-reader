@@ -53,7 +53,7 @@ void UITheme::setTheme(CrossPointSettings::UI_THEME type) {
     case CrossPointSettings::UI_THEME::VESPERUI:
       LOG_DBG("UI", "Using VesperUI theme");
       currentTheme = std::make_unique<VesperTheme>();
-      currentMetrics = &VesperMetrics::values;
+      currentMetrics = &VesperMetrics::portraitValues;
       break;
   }
   metricsValid = false;
