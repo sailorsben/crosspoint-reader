@@ -283,9 +283,8 @@ bool HomeActivity::drawVesperCoverArt() {
 void HomeActivity::renderVesperGrayCovers() {
   if (vesperGrayCoversOnPanel || recentBooks.empty()) return;
 
-  const bool graySupported =
-      renderer.grayscaleCapabilities(HalDisplay::GrayscaleMode::Direct).supported() ||
-      renderer.grayscaleCapabilities(HalDisplay::GrayscaleMode::Absolute).supported();
+  const bool graySupported = renderer.grayscaleCapabilities(HalDisplay::GrayscaleMode::Direct).supported() ||
+                             renderer.grayscaleCapabilities(HalDisplay::GrayscaleMode::Absolute).supported();
   if (!graySupported) return;
 
   // Free the regional snapshot first so the full BW store has headroom.
@@ -484,8 +483,8 @@ void HomeActivity::render(RenderLock&&) {
   // Record the tile rect so storeCoverBuffer (called from the theme) knows
   // which sub-region of the framebuffer to snapshot. ~16 KB in Portrait
   // instead of the 48 KB full framebuffer the previous bind captured.
-  const bool coverGeometryChanged = coverRectX != 0 || coverRectY != metrics.homeTopPadding || coverRectW != pageWidth ||
-                                    coverRectH != metrics.homeCoverTileHeight;
+  const bool coverGeometryChanged = coverRectX != 0 || coverRectY != metrics.homeTopPadding ||
+                                    coverRectW != pageWidth || coverRectH != metrics.homeCoverTileHeight;
   coverRectX = 0;
   coverRectY = metrics.homeTopPadding;
   coverRectW = pageWidth;

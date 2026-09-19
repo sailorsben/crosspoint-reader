@@ -487,7 +487,6 @@ bool Xtc::generateThumbBmp(int height) const {
   return true;
 }
 
-
 std::string Xtc::getVesperThumbBmpPath(const int width, const int height) const {
   return cachePath + "/thumb_vui2_" + std::to_string(width) + "x" + std::to_string(height) + ".bmp";
 }
@@ -513,8 +512,7 @@ bool Xtc::generateVesperThumbBmp(const int targetWidth, const int targetHeight) 
   const uint32_t rowSize = (static_cast<uint32_t>(targetWidth) * 2 + 31) / 32 * 4;
   auto scratch = makeUniqueNoThrow<uint8_t[]>(bitmapSize + rowSize);
   if (!scratch) {
-    LOG_ERR("XTC", "OOM: VesperUI thumb buffers (%lu bytes)",
-            static_cast<unsigned long>(bitmapSize + rowSize));
+    LOG_ERR("XTC", "OOM: VesperUI thumb buffers (%lu bytes)", static_cast<unsigned long>(bitmapSize + rowSize));
     return false;
   }
   uint8_t* pageBuffer = scratch.get();
@@ -526,14 +524,13 @@ bool Xtc::generateVesperThumbBmp(const int targetWidth, const int targetHeight) 
   uint32_t cropY = 0;
   uint32_t cropW = pageInfo.width;
   uint32_t cropH = pageInfo.height;
-  if (static_cast<uint64_t>(pageInfo.width) * targetHeight >
-      static_cast<uint64_t>(pageInfo.height) * targetWidth) {
-    cropW = std::max<uint32_t>(1, static_cast<uint32_t>(
-                                      static_cast<uint64_t>(pageInfo.height) * targetWidth / targetHeight));
+  if (static_cast<uint64_t>(pageInfo.width) * targetHeight > static_cast<uint64_t>(pageInfo.height) * targetWidth) {
+    cropW = std::max<uint32_t>(
+        1, static_cast<uint32_t>(static_cast<uint64_t>(pageInfo.height) * targetWidth / targetHeight));
     cropX = (pageInfo.width - cropW) / 2;
   } else {
-    cropH = std::max<uint32_t>(1, static_cast<uint32_t>(
-                                      static_cast<uint64_t>(pageInfo.width) * targetHeight / targetWidth));
+    cropH = std::max<uint32_t>(
+        1, static_cast<uint32_t>(static_cast<uint64_t>(pageInfo.width) * targetHeight / targetWidth));
     cropY = (pageInfo.height - cropH) / 2;
   }
 
@@ -541,10 +538,12 @@ bool Xtc::generateVesperThumbBmp(const int targetWidth, const int targetHeight) 
   if (!Storage.openFileForWrite("XTC", outputPath, thumb)) return false;
 
   // 2-bit top-down BMP: black, dark gray, light gray, white.
+  // clang-format off
   uint8_t header[70] = {
       'B', 'M', 0, 0, 0, 0, 0, 0, 0, 0, 70, 0, 0, 0, 40, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 2, 0,
       0,   0,   0, 0, 0, 0, 0, 0, 0x13, 0x0B, 0, 0, 0x13, 0x0B, 0, 0, 4, 0, 0, 0, 4, 0, 0, 0,
       0x00, 0x00, 0x00, 0x00, 0x55, 0x55, 0x55, 0x00, 0xAA, 0xAA, 0xAA, 0x00, 0xFF, 0xFF, 0xFF, 0x00};
+  // clang-format on
   const uint32_t imageSize = rowSize * static_cast<uint32_t>(targetHeight);
   const uint32_t fileSize = sizeof(header) + imageSize;
   const int32_t topDownHeight = -targetHeight;
@@ -581,8 +580,7 @@ bool Xtc::generateVesperThumbBmp(const int targetWidth, const int targetHeight) 
             const size_t colIndex = pageInfo.width - 1 - sx;
             const size_t byteOffset = colIndex * colBytes + sy / 8;
             const uint8_t shift = 7 - (sy % 8);
-            const uint8_t value = (((plane1[byteOffset] >> shift) & 1) << 1) |
-                                  ((plane2[byteOffset] >> shift) & 1);
+            const uint8_t value = (((plane1[byteOffset] >> shift) & 1) << 1) | ((plane2[byteOffset] >> shift) & 1);
             static constexpr uint8_t XTH_GRAY[4] = {255, 85, 170, 0};
             gray = XTH_GRAY[value];
           } else {

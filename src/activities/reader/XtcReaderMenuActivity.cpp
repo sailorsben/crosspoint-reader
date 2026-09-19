@@ -114,8 +114,7 @@ void XtcReaderMenuActivity::buildScreen(UiScreen& screen) {
   const int headerHeight = screenW > screenH ? 50 : 58;
 
   screen.setContentMarginFromScreen(fui::Insets{
-      static_cast<int16_t>(modal.y + headerHeight),
-      static_cast<int16_t>(screenW - (modal.x + modal.width) + inset),
+      static_cast<int16_t>(modal.y + headerHeight), static_cast<int16_t>(screenW - (modal.x + modal.width) + inset),
       static_cast<int16_t>(screenH - (modal.y + modal.height) + inset), static_cast<int16_t>(modal.x + inset)});
 
   char progress[32];
@@ -156,11 +155,9 @@ void XtcReaderMenuActivity::drawChrome() {
   const char* header = tr(STR_READER_MENU);
   const int headerWidth = renderer.getTextWidth(UI_12_FONT_ID, header, EpdFontFamily::BOLD);
   const int headerX = modal.x + (modal.width - headerWidth) / 2;
-  const int headerY =
-      modal.y + (headerHeight - renderer.getLineHeight(UI_12_FONT_ID)) / 2 - (landscape ? 1 : 0);
+  const int headerY = modal.y + (headerHeight - renderer.getLineHeight(UI_12_FONT_ID)) / 2 - (landscape ? 1 : 0);
   renderer.drawText(UI_12_FONT_ID, headerX, headerY, header, true, EpdFontFamily::BOLD);
-  renderer.drawLine(modal.x + 12, modal.y + headerHeight - 1, modal.x + modal.width - 13,
-                    modal.y + headerHeight - 1);
+  renderer.drawLine(modal.x + 12, modal.y + headerHeight - 1, modal.x + modal.width - 13, modal.y + headerHeight - 1);
 }
 
 void XtcReaderMenuActivity::render(RenderLock&&) {

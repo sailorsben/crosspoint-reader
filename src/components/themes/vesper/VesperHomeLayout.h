@@ -84,8 +84,7 @@ inline Rect coverRect(const Layout& l, const int bookIndex) {
   }
 
   constexpr int titleReserve = 42;
-  return Rect{card.x + 4, card.y + 2, std::max(1, card.width - 8),
-              std::max(1, card.height - titleReserve - 4)};
+  return Rect{card.x + 4, card.y + 2, std::max(1, card.width - 8), std::max(1, card.height - titleReserve - 4)};
 }
 
 inline int hitBook(const Layout& l, const int bookCount, const int x, const int y) {

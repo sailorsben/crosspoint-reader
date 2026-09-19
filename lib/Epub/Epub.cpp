@@ -909,9 +909,8 @@ bool Epub::generateVesperThumbBmp(const int width, const int height) const {
     return false;
   }
 
-  const bool success =
-      isJpeg ? JpegToBmpConverter::jpegFileToVesperThumbBmpStreamWithSize(source, thumb, width, height)
-             : PngToBmpConverter::pngFileToVesperThumbBmpStreamWithSize(source, thumb, width, height);
+  const bool success = isJpeg ? JpegToBmpConverter::jpegFileToVesperThumbBmpStreamWithSize(source, thumb, width, height)
+                              : PngToBmpConverter::pngFileToVesperThumbBmpStreamWithSize(source, thumb, width, height);
   source.close();
   thumb.close();
   Storage.remove(tempPath.c_str());

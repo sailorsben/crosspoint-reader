@@ -917,7 +917,7 @@ void KeyboardEntryActivity::render(RenderLock&&) {
   if (cursorMode) {
     tipCount = 1;
   } else if (inputType == InputType::Number) {
-    tipCount = !text.empty() ? 1 : 0;
+    tipCount = 0;
   } else if (urlPanel) {
     tipCount = 1 + (!text.empty() ? 1 : 0);
   } else if (symbols) {

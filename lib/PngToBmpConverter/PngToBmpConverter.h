@@ -12,6 +12,5 @@ class PngToBmpConverter {
   static bool pngFileToBmpStream(HalFile& pngFile, Print& bmpOut, bool crop = true, bool originalThresholds = false);
   static bool pngFileToBmpStreamWithSize(HalFile& pngFile, Print& bmpOut, int targetMaxWidth, int targetMaxHeight);
   static bool pngFileTo1BitBmpStreamWithSize(HalFile& pngFile, Print& bmpOut, int targetMaxWidth, int targetMaxHeight);
-  static bool pngFileToVesperThumbBmpStreamWithSize(HalFile& pngFile, Print& bmpOut, int targetWidth,
-                                                    int targetHeight);
+  static bool pngFileToVesperThumbBmpStreamWithSize(HalFile& pngFile, Print& bmpOut, int targetWidth, int targetHeight);
 };
