@@ -385,6 +385,14 @@ void BaseTheme::drawHeader(const GfxRenderer& renderer, Rect rect, const char* t
   battery.glyphWidth = static_cast<int16_t>(metrics.batteryWidth);
   battery.glyphHeight = static_cast<int16_t>(metrics.batteryHeight);
   battery.gap = batteryPercentSpacing;
+  if (SETTINGS.uiTheme == CrossPointSettings::UI_THEME::VESPERUI) {
+    battery.style = fui::BatteryIndicatorStyle::Bar;
+    battery.barTrack = fui::BatteryBarTrack::Outline;
+    battery.barFill = fui::BatteryBarFill::Segments;
+    battery.barSegments = 4;
+    battery.barSegmentGap = 1;
+    battery.barCaps = fui::BatteryBarCaps::Square;
+  }
   // Detached: hug the corner (12px, the legacy inset) within the battery
   // strip; shared line: sit on the content grid. Both anchor to the band's top
   // strip (batteryBarHeight) — the legacy shared-line headers drew the battery

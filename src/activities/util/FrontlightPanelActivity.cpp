@@ -56,7 +56,10 @@ uint8_t percentFromPermille(const int16_t permille) {
 FrontlightPanelActivity::FrontlightPanelActivity(GfxRenderer& renderer, MappedInputManager& mappedInput)
     : Activity("FrontlightPanel", renderer, mappedInput), UiAppHost(renderer) {}
 
+void FrontlightPanelActivity::applyDisplayOrientation() { Activity::applyDisplayOrientation(); }
+
 void FrontlightPanelActivity::onEnter() {
+  applyDisplayOrientation();
   Activity::onEnter();
 
   // A stored 0% predates the 1% floor (or came from the web settings): show it
@@ -157,12 +160,20 @@ void FrontlightPanelActivity::runTile(const int idx) {
       renderer.promoteNextRefresh(HalDisplay::FULL_REFRESH);
       close();
       break;
-    case 2:  // Cycle the reading orientation
-      SETTINGS.orientation = static_cast<uint8_t>((SETTINGS.orientation + 1) % 4);
-      SETTINGS.saveToFile();
-      // Only the setting changes: turning the renderer cropped the portrait-only
-      // screens the panel opens over. The reader reflows on its next loop().
-      requestUpdate();
+    case 2:  // Cycle the active orientation
+      if (SETTINGS.uiTheme == CrossPointSettings::UI_THEME::VESPERUI) {
+        SETTINGS.interfaceOrientation =
+            static_cast<uint8_t>((SETTINGS.interfaceOrientation + 1) %
+                                 CrossPointSettings::INTERFACE_ORIENTATION_COUNT);
+        SETTINGS.saveToFile();
+        applyDisplayOrientation();
+        resetUi();
+        requestUpdate();
+      } else {
+        SETTINGS.orientation = static_cast<uint8_t>((SETTINGS.orientation + 1) % 4);
+        SETTINGS.saveToFile();
+        requestUpdate();
+      }
       break;
     case 3:  // Touch reader controls (for reading with the palm on the glass)
       // Toggles the existing Settings -> Controls option, nothing lower-level:
@@ -357,9 +368,15 @@ void FrontlightPanelActivity::buildPanelScreen(UiScreen& screen) {
     const int16_t bandH = std::max<int16_t>(static_cast<int16_t>(metrics.batteryHeight),
                                             screen.target().lineHeight(theme.smallText.font));
     screen.takeTop(bandH, theme.spaceMd);
-    UITheme::getInstance().getTheme().BaseTheme::drawHeader(
-        renderer, Rect{0, metrics.topPadding, renderer.getScreenWidth(), metrics.homeTopPadding - metrics.topPadding},
-        nullptr);
+    if (SETTINGS.uiTheme == CrossPointSettings::UI_THEME::VESPERUI) {
+      GUI.drawHeader(
+          renderer, Rect{0, metrics.topPadding, renderer.getScreenWidth(), metrics.homeTopPadding - metrics.topPadding},
+          nullptr);
+    } else {
+      UITheme::getInstance().getTheme().BaseTheme::drawHeader(
+          renderer, Rect{0, metrics.topPadding, renderer.getScreenWidth(), metrics.homeTopPadding - metrics.topPadding},
+          nullptr);
+    }
   }
 
   if (Frontlight.present()) {
@@ -375,11 +392,15 @@ void FrontlightPanelActivity::buildPanelScreen(UiScreen& screen) {
   // setting is currently on draws filled (StateChecked -> selected style).
   // Touch boards only — the tiles are touch targets.
   if (mappedInput.hasTouch()) {
-    static constexpr StrId kOrientNames[4] = {StrId::STR_PORTRAIT, StrId::STR_LANDSCAPE_CW,
-                                              StrId::STR_ORIENTATION_INVERTED, StrId::STR_LANDSCAPE_CCW};
-    // The orientation tile is labelled with just the current mode ("Portrait"):
-    // the mode names say what the tile is about on their own.
-    const char* orientLabel = I18N.get(kOrientNames[SETTINGS.orientation % 4]);
+    static constexpr StrId kReaderOrientNames[4] = {StrId::STR_PORTRAIT, StrId::STR_LANDSCAPE_CW,
+                                                    StrId::STR_ORIENTATION_INVERTED, StrId::STR_LANDSCAPE_CCW};
+    static constexpr StrId kInterfaceOrientNames[CrossPointSettings::INTERFACE_ORIENTATION_COUNT] = {
+        StrId::STR_PORTRAIT, StrId::STR_LANDSCAPE_CW, StrId::STR_LANDSCAPE_CCW};
+    const char* orientLabel =
+        SETTINGS.uiTheme == CrossPointSettings::UI_THEME::VESPERUI
+            ? I18N.get(kInterfaceOrientNames[SETTINGS.interfaceOrientation %
+                                            CrossPointSettings::INTERFACE_ORIENTATION_COUNT])
+            : I18N.get(kReaderOrientNames[SETTINGS.orientation % 4]);
     // "Touch On" / "Touch Off", from the existing state strings: the label
     // names the current state of the touch-reader-controls setting.
     const bool touchOn = SETTINGS.touchReaderControls != CrossPointSettings::TOUCH_READER_OFF;

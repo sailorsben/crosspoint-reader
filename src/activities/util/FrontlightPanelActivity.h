@@ -83,6 +83,7 @@ class FrontlightPanelActivity final : public Activity, private UiAppHost {
   explicit FrontlightPanelActivity(GfxRenderer& renderer, MappedInputManager& mappedInput);
   void onEnter() override;
   void onExit() override;
+  void applyDisplayOrientation() override;
   void loop() override;
   void render(RenderLock&&) override;
   bool handleHomeGesture() override;
