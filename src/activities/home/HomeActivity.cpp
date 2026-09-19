@@ -20,6 +20,7 @@
 #include "OpdsServerStore.h"
 #include "RecentBooksStore.h"
 #include "components/UITheme.h"
+#include "components/themes/vesper/VesperHomeLayout.h"
 #include "fontIds.h"
 
 int HomeActivity::getMenuItemCount() const {
@@ -229,48 +230,83 @@ void HomeActivity::loop() {
     return;
   }
 
-  const int coverColumnCount = std::max(1, metrics.homeRecentBooksCount);
-  const int recentCount = std::min(static_cast<int>(recentBooks.size()), coverColumnCount);
-  const int coverColumnWidth = (renderer.getScreenWidth() - 2 * metrics.contentSidePadding) / coverColumnCount;
-  int touchedBook = -1;
-  const auto coverTouch = mappedInput.colTouch(touchedBook, metrics.contentSidePadding, coverColumnWidth, recentCount,
-                                               metrics.homeTopPadding,
-                                               metrics.homeTopPadding + metrics.homeCoverTileHeight, coverColumnWidth);
-  if (coverTouch != MappedInputManager::RowTouch::None) {
-    if (coverTouch == MappedInputManager::RowTouch::Down) {
-      if (selectorIndex != touchedBook) {
-        selectorIndex = touchedBook;
-        requestUpdate();
-      }
-    } else {
-      selectorIndex = touchedBook;
-      activateSelection();
-    }
-    return;
-  }
-
   const int menuTop = metrics.homeTopPadding + metrics.homeCoverTileHeight + metrics.homeMenuTopOffset;
   const int renderedMenuCount =
       menuCount - (metrics.homeContinueReadingInMenu ? 0 : static_cast<int>(recentBooks.size()));
-  int menuRow = -1;
-  // Row height from the theme, not the metrics table: RoundedRaff draws
-  // font-derived rows and the touch grid must match the visuals exactly.
-  const int menuRowHeight = GUI.getMenuRowHeight(renderer);
-  const auto menuTouch = mappedInput.rowTouch(menuRow, menuTop, menuRowHeight + metrics.menuSpacing, renderedMenuCount,
-                                              0, INT32_MAX, menuRowHeight);
-  if (menuTouch != MappedInputManager::RowTouch::None) {
-    const int touchedIndex =
-        metrics.homeContinueReadingInMenu ? menuRow : menuRow + static_cast<int>(recentBooks.size());
-    if (menuTouch == MappedInputManager::RowTouch::Down) {
-      if (selectorIndex != touchedIndex) {
+
+  if (SETTINGS.uiTheme == CrossPointSettings::UI_THEME::VESPERUI) {
+    const Rect bookBand{0, metrics.homeTopPadding, renderer.getScreenWidth(), metrics.homeCoverTileHeight};
+    const auto layout = VesperHome::bookLayout(bookBand, static_cast<int>(recentBooks.size()));
+    const Rect navAvailable{0, menuTop, renderer.getScreenWidth(), std::max(0, renderer.getScreenHeight() - menuTop)};
+
+    int tx = 0;
+    int ty = 0;
+    if (mappedInput.isScreenTouchHeld(tx, ty)) {
+      int touchedIndex = VesperHome::hitBook(layout, static_cast<int>(recentBooks.size()), tx, ty);
+      if (touchedIndex < 0) {
+        const int nav = VesperHome::hitNav(navAvailable, renderedMenuCount, tx, ty);
+        if (nav >= 0) touchedIndex = static_cast<int>(recentBooks.size()) + nav;
+      }
+      if (touchedIndex >= 0 && selectorIndex != touchedIndex) {
         selectorIndex = touchedIndex;
         requestUpdate();
       }
-    } else {
-      selectorIndex = touchedIndex;
-      activateSelection();
     }
-    return;
+
+    if (mappedInput.wasScreenTapped(tx, ty)) {
+      int touchedIndex = VesperHome::hitBook(layout, static_cast<int>(recentBooks.size()), tx, ty);
+      if (touchedIndex < 0) {
+        const int nav = VesperHome::hitNav(navAvailable, renderedMenuCount, tx, ty);
+        if (nav >= 0) touchedIndex = static_cast<int>(recentBooks.size()) + nav;
+      }
+      if (touchedIndex >= 0) {
+        selectorIndex = touchedIndex;
+        activateSelection();
+        return;
+      }
+    }
+  } else {
+    const int coverColumnCount = std::max(1, metrics.homeRecentBooksCount);
+    const int recentCount = std::min(static_cast<int>(recentBooks.size()), coverColumnCount);
+    const int coverColumnWidth = (renderer.getScreenWidth() - 2 * metrics.contentSidePadding) / coverColumnCount;
+    int touchedBook = -1;
+    const auto coverTouch =
+        mappedInput.colTouch(touchedBook, metrics.contentSidePadding, coverColumnWidth, recentCount, metrics.homeTopPadding,
+                             metrics.homeTopPadding + metrics.homeCoverTileHeight, coverColumnWidth);
+    if (coverTouch != MappedInputManager::RowTouch::None) {
+      if (coverTouch == MappedInputManager::RowTouch::Down) {
+        if (selectorIndex != touchedBook) {
+          selectorIndex = touchedBook;
+          requestUpdate();
+        }
+      } else {
+        selectorIndex = touchedBook;
+        activateSelection();
+      }
+      return;
+    }
+
+    int menuRow = -1;
+    // Row height from the theme, not the metrics table: RoundedRaff draws
+    // font-derived rows and the touch grid must match the visuals exactly.
+    const int menuRowHeight = GUI.getMenuRowHeight(renderer);
+    const auto menuTouch =
+        mappedInput.rowTouch(menuRow, menuTop, menuRowHeight + metrics.menuSpacing, renderedMenuCount, 0, INT32_MAX,
+                             menuRowHeight);
+    if (menuTouch != MappedInputManager::RowTouch::None) {
+      const int touchedIndex =
+          metrics.homeContinueReadingInMenu ? menuRow : menuRow + static_cast<int>(recentBooks.size());
+      if (menuTouch == MappedInputManager::RowTouch::Down) {
+        if (selectorIndex != touchedIndex) {
+          selectorIndex = touchedIndex;
+          requestUpdate();
+        }
+      } else {
+        selectorIndex = touchedIndex;
+        activateSelection();
+      }
+      return;
+    }
   }
 
   if (mappedInput.wasReleased(MappedInputManager::Button::Confirm)) {

@@ -63,12 +63,21 @@ const ThemeMetrics& UITheme::getMetrics() const {
   // hasTouch() can flip once touch init completes after static construction, so the
   // cached copy is refreshed when the flag differs instead of copying the struct per call.
   const bool touch = gpio.hasTouch();
-  if (!metricsValid || touch != metricsForTouch) {
-    adjustedMetrics = *currentMetrics;
+  const bool vesper = SETTINGS.uiTheme == CrossPointSettings::UI_THEME::VESPERUI;
+  const uint8_t interfaceOrientation = vesper ? SETTINGS.interfaceOrientation : 0xFF;
+  const ThemeMetrics* sourceMetrics = currentMetrics;
+  if (vesper) {
+    sourceMetrics = interfaceOrientation == CrossPointSettings::UI_PORTRAIT ? &VesperMetrics::portraitValues
+                                                                            : &VesperMetrics::landscapeValues;
+  }
+
+  if (!metricsValid || touch != metricsForTouch || interfaceOrientation != metricsInterfaceOrientation) {
+    adjustedMetrics = *sourceMetrics;
     if (touch) {
       adjustedMetrics.buttonHintsHeight = 0;
     }
     metricsForTouch = touch;
+    metricsInterfaceOrientation = interfaceOrientation;
     metricsValid = true;
   }
   return adjustedMetrics;
