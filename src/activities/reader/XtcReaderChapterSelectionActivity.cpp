@@ -91,14 +91,32 @@ bool XtcReaderChapterSelectionActivity::handleButtons() {
   return false;
 }
 
+Rect XtcReaderChapterSelectionActivity::overlayRect() const {
+  const int screenW = renderer.getScreenWidth();
+  const int screenH = renderer.getScreenHeight();
+  if (screenW > screenH) {
+    const int width = std::min(720, screenW - 40);
+    const int height = std::min(400, screenH - 48);
+    return Rect{(screenW - width) / 2, (screenH - height) / 2, width, height};
+  }
+
+  const int width = screenW - 28;
+  const int height = screenH - 90;
+  return Rect{14, 45, width, height};
+}
+
 void XtcReaderChapterSelectionActivity::buildScreen(UiScreen& screen) {
   const auto& metrics = UITheme::getInstance().getMetrics();
-  const Rect safe = UITheme::getInstance().getScreenSafeArea(renderer, true, false);
-  // Content: the safe area minus the header band drawChrome paints the title in.
+  const Rect modal = overlayRect();
+  const int screenW = renderer.getScreenWidth();
+  const int screenH = renderer.getScreenHeight();
+  const int headerHeight = screenW > screenH ? 50 : 58;
+  const int inset = 14;
+
   screen.setContentMarginFromScreen(fui::Insets{
-      static_cast<int16_t>(safe.y + metrics.topPadding + metrics.headerHeight),
-      static_cast<int16_t>(renderer.getScreenWidth() - (safe.x + safe.width)),
-      static_cast<int16_t>(renderer.getScreenHeight() - (safe.y + safe.height)), static_cast<int16_t>(safe.x)});
+      static_cast<int16_t>(modal.y + headerHeight),
+      static_cast<int16_t>(screenW - (modal.x + modal.width) + inset),
+      static_cast<int16_t>(screenH - (modal.y + modal.height) + inset), static_cast<int16_t>(modal.x + inset)});
   screen.spacer(static_cast<int16_t>(metrics.verticalSpacing));
 
   if (!xtc) {
@@ -121,8 +139,24 @@ void XtcReaderChapterSelectionActivity::buildScreen(UiScreen& screen) {
 }
 
 void XtcReaderChapterSelectionActivity::drawChrome() {
-  const auto& metrics = UITheme::getInstance().getMetrics();
-  const Rect safe = UITheme::getInstance().getScreenSafeArea(renderer, true, false);
-  GUI.drawHeader(renderer, Rect{safe.x, safe.y + metrics.topPadding, safe.width, metrics.headerHeight},
-                 tr(STR_SELECT_CHAPTER));
+  const Rect modal = overlayRect();
+  const bool landscape = renderer.getScreenWidth() > renderer.getScreenHeight();
+  const int headerHeight = landscape ? 50 : 58;
+
+  renderer.fillRect(modal.x, modal.y, modal.width, modal.height, false);
+  renderer.drawRect(modal.x, modal.y, modal.width, modal.height, 2, true);
+
+  const char* header = tr(STR_SELECT_CHAPTER);
+  const int headerWidth = renderer.getTextWidth(UI_12_FONT_ID, header, EpdFontFamily::BOLD);
+  const int headerX = modal.x + (modal.width - headerWidth) / 2;
+  const int headerY = modal.y + (headerHeight - renderer.getLineHeight(UI_12_FONT_ID)) / 2;
+  renderer.drawText(UI_12_FONT_ID, headerX, headerY, header, true, EpdFontFamily::BOLD);
+  renderer.drawLine(modal.x + 12, modal.y + headerHeight - 1, modal.x + modal.width - 13,
+                    modal.y + headerHeight - 1);
+}
+
+void XtcReaderChapterSelectionActivity::render(RenderLock&&) {
+  drawChrome();
+  renderUi();
+  renderer.displayBuffer(HalDisplay::FAST_REFRESH);
 }

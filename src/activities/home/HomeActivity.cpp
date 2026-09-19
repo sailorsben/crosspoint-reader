@@ -206,6 +206,23 @@ void HomeActivity::loadRecentCovers(int coverHeight) {
   recentsLoading = false;
 }
 
+void HomeActivity::promoteRecentToHero(const int index) {
+  if (index <= 0 || index >= static_cast<int>(recentBooks.size())) return;
+
+  std::swap(recentBooks[0], recentBooks[static_cast<size_t>(index)]);
+  loadVesperProgress(recentBooks[0]);
+  selectorIndex = 0;
+
+  // Hero and side rows use different geometry. Regenerate only the Vesper
+  // thumbnails needed by the new layout instead of stretching a tiny recent.
+  freeCoverBuffer();
+  coverRendered = false;
+  vesperGrayCoversOnPanel = false;
+  recentsLoaded = false;
+  recentsLoading = false;
+  requestUpdate();
+}
+
 void HomeActivity::onEnter() {
   Activity::onEnter();
 
@@ -322,9 +339,34 @@ void HomeActivity::loop() {
   const int menuCount = getMenuItemCount();
   const auto& metrics = UITheme::getInstance().getMetrics();
 
+  if (SETTINGS.uiTheme == CrossPointSettings::UI_THEME::VESPERUI) {
+    int longX = 0;
+    int longY = 0;
+    if (mappedInput.wasScreenLongPress(longX, longY)) {
+      SETTINGS.interfaceOrientation =
+          SETTINGS.interfaceOrientation == CrossPointSettings::UI_PORTRAIT
+              ? CrossPointSettings::UI_LANDSCAPE_CW
+              : CrossPointSettings::UI_PORTRAIT;
+      SETTINGS.saveToFile();
+
+      freeCoverBuffer();
+      coverRendered = false;
+      vesperGrayCoversOnPanel = false;
+      recentsLoaded = false;
+      recentsLoading = false;
+      applyDisplayOrientation();
+      requestUpdate();
+      return;
+    }
+  }
+
   auto activateSelection = [this] {
-    if (selectorIndex < recentBooks.size()) {
-      onSelectBook(recentBooks[selectorIndex].path);
+    if (selectorIndex < static_cast<int>(recentBooks.size())) {
+      if (SETTINGS.uiTheme == CrossPointSettings::UI_THEME::VESPERUI && selectorIndex > 0) {
+        promoteRecentToHero(selectorIndex);
+        return;
+      }
+      onSelectBook(recentBooks[static_cast<size_t>(selectorIndex)].path);
       return;
     }
     const int menuIndex = selectorIndex - static_cast<int>(recentBooks.size());

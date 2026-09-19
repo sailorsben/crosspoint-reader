@@ -63,7 +63,7 @@ void drawVesperLogo(const GfxRenderer& renderer, const int x, const int y, const
     const int srcRow = row * kLogoSourceSize / size;
     for (int col = 0; col < size; col++) {
       const int srcCol = col * kLogoSourceSize / size;
-      const uint8_t byte = VesperAssets::Logo64[srcRow * rowBytes + (srcCol >> 3)];
+      const uint8_t byte = VesperAssets::Logo56[srcRow * rowBytes + (srcCol >> 3)];
       if (((byte >> (7 - (srcCol & 7))) & 1) == 0) renderer.drawPixel(x + col, y + row, true);
     }
   }
@@ -171,13 +171,17 @@ void drawLandscapeRecents(const GfxRenderer& renderer, const VesperHome::Layout&
                           const std::vector<RecentBook>& recentBooks) {
   for (int i = 0; i < layout.recentCount; i++) {
     const Rect card = layout.recent[i];
-    const Rect cover = VesperHome::coverRect(layout, i + 1);
-    VesperTheme::drawBookCover(renderer, recentBooks[static_cast<size_t>(i + 1)], cover);
-    renderer.drawRect(cover.x, cover.y, cover.width, cover.height);
+    const RecentBook& book = recentBooks[static_cast<size_t>(i + 1)];
 
-    const int textX = cover.x + cover.width + 10;
-    const Rect title{textX, card.y + 10, card.x + card.width - textX - 4, card.height - 16};
-    drawTitleLines(renderer, recentBooks[static_cast<size_t>(i + 1)], title, UI_10_FONT_ID, 2, false);
+    const Rect title{card.x + 8, card.y + 8, card.width - 16, std::max(1, card.height - 28)};
+    drawTitleLines(renderer, book, title, UI_10_FONT_ID, 2, false);
+
+    if (!book.author.empty()) {
+      const std::string author =
+          renderer.truncatedText(SMALL_FONT_ID, book.author.c_str(), card.width - 16, EpdFontFamily::REGULAR);
+      renderer.drawText(SMALL_FONT_ID, card.x + 8,
+                        card.y + card.height - renderer.getLineHeight(SMALL_FONT_ID) - 5, author.c_str());
+    }
   }
 }
 }  // namespace
@@ -214,8 +218,7 @@ void VesperTheme::drawHeader(const GfxRenderer& renderer, const Rect rect, const
                              const char* subtitle) const {
   BaseTheme::drawHeader(renderer, rect, title, subtitle);
 
-  const bool landscape = renderer.getScreenWidth() > renderer.getScreenHeight();
-  const int logoSize = landscape ? 48 : 54;
+  const int logoSize = VesperAssets::LOGO_SIZE;
   const int logoX = rect.x + (rect.width - logoSize) / 2;
   const int logoY = rect.y + std::max(0, (rect.height - logoSize) / 2);
   drawVesperLogo(renderer, logoX, logoY, logoSize);

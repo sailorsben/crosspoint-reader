@@ -101,6 +101,7 @@ void XtcReaderActivity::onReaderMenuConfirm(const XtcReaderMenuActivity::MenuAct
 
   switch (action) {
     case XtcReaderMenuActivity::MenuAction::GO_TO_PAGE: {
+      requestUpdateAndWait();
       const uint32_t pageCount = xtc->getPageCount();
       if (pageCount == 0) return;
       const size_t maxLength = std::to_string(static_cast<unsigned long>(pageCount)).length();
@@ -136,6 +137,7 @@ void XtcReaderActivity::onReaderMenuConfirm(const XtcReaderMenuActivity::MenuAct
       break;
     }
     case XtcReaderMenuActivity::MenuAction::SELECT_CHAPTER:
+      requestUpdateAndWait();
       openChapterSelection();
       break;
     case XtcReaderMenuActivity::MenuAction::AUTO_PAGE_TURN:
@@ -234,8 +236,13 @@ void XtcReaderActivity::renderStatusBarOverlay(GfxRenderer& renderer, const Stat
     return;
   }
 
+  const GfxRenderer::Orientation pageOrientation = renderer.getOrientation();
+  const GfxRenderer::Orientation overlayOrientation = tapInputOrientation();
+  if (pageOrientation != overlayOrientation) renderer.setOrientation(overlayOrientation);
+
   const int statusBarHeight = UITheme::getInstance().getStatusBarHeight();
   if (statusBarHeight <= 0) {
+    if (pageOrientation != overlayOrientation) renderer.setOrientation(pageOrientation);
     return;
   }
 
@@ -266,6 +273,8 @@ void XtcReaderActivity::renderStatusBarOverlay(GfxRenderer& renderer, const Stat
   const float progress = pageCount > 0 ? (static_cast<float>(displayPage) * 100.0f) / pageCount : 0.0f;
   const auto pageInfo = getStatusBarInfo();
   GUI.drawStatusBar(renderer, progress, pageInfo.currentPage, pageInfo.pageCount, pageInfo.title, paddingBottom);
+
+  if (pageOrientation != overlayOrientation) renderer.setOrientation(pageOrientation);
 }
 
 void XtcReaderActivity::renderPage() {

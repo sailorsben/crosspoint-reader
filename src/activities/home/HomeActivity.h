@@ -70,6 +70,7 @@ class HomeActivity final : public Activity {
   void freeCoverBuffer();     // Free the stored cover buffer
   void loadRecentBooks(int maxBooks);
   void loadRecentCovers(int coverHeight);
+  void promoteRecentToHero(int index);
   void loadVesperProgress(RecentBook& book);
   bool drawVesperCoverArt();
   void renderVesperGrayCovers();

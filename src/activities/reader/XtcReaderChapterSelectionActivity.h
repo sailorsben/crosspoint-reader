@@ -15,6 +15,7 @@ class XtcReaderChapterSelectionActivity final : public UiListActivity {
   // instead of rebuilding a ListItem vector per render.
   std::vector<freeink::ui::ListItem> rowItems;
   void buildRowItems();
+  Rect overlayRect() const;
 
   int listCount() const override { return xtc ? static_cast<int>(xtc->getChapters().size()) : 0; }
   void buildScreen(UiScreen& screen) override;
@@ -29,4 +30,5 @@ class XtcReaderChapterSelectionActivity final : public UiListActivity {
   explicit XtcReaderChapterSelectionActivity(GfxRenderer& renderer, MappedInputManager& mappedInput,
                                              const std::shared_ptr<Xtc>& xtc, uint32_t currentPage);
   void onEnter() override;
+  void render(RenderLock&&) override;
 };

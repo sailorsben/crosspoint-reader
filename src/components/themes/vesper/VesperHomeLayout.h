@@ -79,8 +79,9 @@ inline Rect coverRect(const Layout& l, const int bookIndex) {
 
   const Rect card = l.recent[recentIndex];
   if (l.landscape) {
-    const int coverWidth = std::min(76, card.width * 34 / 100);
-    return Rect{card.x + 3, card.y + 3, coverWidth, std::max(1, card.height - 6)};
+    // Side covers are too small to survive e-ink well. Landscape recents are
+    // deliberately text-only; selecting one promotes it into the hero pane.
+    return {};
   }
 
   constexpr int titleReserve = 42;

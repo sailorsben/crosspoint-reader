@@ -524,6 +524,20 @@ fui::Rect KeyboardEntryActivity::keyboardRect() const {
   const int rows = currentLayout().rowCount;
   const int gap = metrics.keyboardKeySpacing;
   const int height = rows * metrics.keyboardKeyHeight + (rows > 1 ? (rows - 1) * gap : 0);
+
+  if (inputType == InputType::Number) {
+    const bool landscape = pageWidth > pageHeight;
+    const int modalWidth = landscape ? std::min(520, pageWidth - 56) : pageWidth - 36;
+    const int modalHeight = landscape ? std::min(360, pageHeight - 40) : std::min(560, pageHeight - 60);
+    const int modalX = (pageWidth - modalWidth) / 2;
+    const int modalY = (pageHeight - modalHeight) / 2;
+    const int width = landscape ? std::min(420, modalWidth - 40) : std::min(340, modalWidth - 40);
+    const int x = modalX + (modalWidth - width) / 2;
+    const int y = modalY + modalHeight - height - 22;
+    return fui::Rect{static_cast<int16_t>(x), static_cast<int16_t>(y), static_cast<int16_t>(width),
+                     static_cast<int16_t>(height)};
+  }
+
   const int width = pageWidth * metrics.keyboardWidthPercent / 100;
   const int x = (pageWidth - width) / 2;
   const int y =
@@ -537,7 +551,8 @@ void KeyboardEntryActivity::loop() {
   int ty = 0;
 
   size_t touchedCursorPos = 0;
-  if (mappedInput.wasScreenTapped(tx, ty) && cursorPositionFromPoint(tx, ty, touchedCursorPos)) {
+  if (inputType != InputType::Number && mappedInput.wasScreenTapped(tx, ty) &&
+      cursorPositionFromPoint(tx, ty, touchedCursorPos)) {
     cursorPos = std::min(touchedCursorPos, text.length());
     // The masked text field maps taps per byte; snap back to a boundary so
     // the cursor never lands inside a multi-byte character.
@@ -567,7 +582,10 @@ void KeyboardEntryActivity::loop() {
     if (result.event) {
       syncSelectionToValue(result.event.value);
       if (activateValue(result.event.value, result.event.longPress)) {
-        requestUpdate();
+        if (inputType == InputType::Number)
+          requestUpdate(true);
+        else
+          requestUpdate();
       }
       return;
     }
@@ -708,7 +726,10 @@ void KeyboardEntryActivity::loop() {
   if (mappedInput.wasReleased(MappedInputManager::Button::Confirm)) {
     if (confirmHeld && !confirmLongHandled && !cursorMode) {
       if (selKey && activateValue(selKey->value, false)) {
-        requestUpdate();
+        if (inputType == InputType::Number)
+          requestUpdate(true);
+        else
+          requestUpdate();
       }
     } else if (confirmHeld && !confirmLongHandled && cursorMode && inputType == InputType::Password && togglePos) {
       passwordVisible = !passwordVisible;
@@ -729,6 +750,65 @@ void KeyboardEntryActivity::loop() {
 }
 
 void KeyboardEntryActivity::render(RenderLock&&) {
+  if (inputType == InputType::Number) {
+    const int pageWidth = renderer.getScreenWidth();
+    const int pageHeight = renderer.getScreenHeight();
+    const bool landscape = pageWidth > pageHeight;
+    const auto& metrics = UITheme::getInstance().getMetrics();
+
+    const int modalWidth = landscape ? std::min(520, pageWidth - 56) : pageWidth - 36;
+    const int modalHeight = landscape ? std::min(360, pageHeight - 40) : std::min(560, pageHeight - 60);
+    const int modalX = (pageWidth - modalWidth) / 2;
+    const int modalY = (pageHeight - modalHeight) / 2;
+
+    renderer.fillRect(modalX, modalY, modalWidth, modalHeight, false);
+    renderer.drawRect(modalX, modalY, modalWidth, modalHeight, 2, true);
+
+    const int titleWidth = renderer.getTextWidth(UI_12_FONT_ID, title.c_str(), EpdFontFamily::BOLD);
+    renderer.drawText(UI_12_FONT_ID, modalX + (modalWidth - titleWidth) / 2, modalY + 14, title.c_str(), true,
+                      EpdFontFamily::BOLD);
+    renderer.drawLine(modalX + 14, modalY + 44, modalX + modalWidth - 15, modalY + 44);
+
+    const std::string displayText = displayTextForCurrentState();
+    const int valueWidth = renderer.getTextWidth(UI_12_FONT_ID, displayText.c_str(), EpdFontFamily::BOLD);
+    const int valueY = modalY + 62;
+    renderer.drawText(UI_12_FONT_ID, modalX + (modalWidth - valueWidth) / 2, valueY, displayText.c_str(), true,
+                      EpdFontFamily::BOLD);
+
+    const int valueLineY = valueY + renderer.getLineHeight(UI_12_FONT_ID) + 6;
+    renderer.drawLine(modalX + 70, valueLineY, modalX + modalWidth - 71, valueLineY);
+
+    const fui::Rect kbRect = keyboardRect();
+    interactions.beginPublishCycle();
+    fui::GfxRendererTarget target(renderer);
+    target.setFont(fui::GfxRendererTarget::FONT_SMALL, SMALL_FONT_ID);
+    target.setFont(fui::GfxRendererTarget::FONT_BODY, UI_12_FONT_ID);
+    const fui::DeviceContext device = target.deviceContext();
+    const fui::InputSnapshot noInput{};
+    fui::Frame<56> frame(target, device, noInput, interactions);
+
+    fui::KeyboardProps props;
+    const fui::KeyboardLayout& layout = currentLayout();
+    props.layout = &layout;
+    props.keyAction = ACTION_KEY;
+    props.okLabel = tr(STR_OK_BUTTON);
+    props.shiftLabel = tr(STR_KEY_SHIFT);
+    props.modeLabel = tr(STR_KEY_MODE_SYMBOLS);
+    props.inputMask = static_cast<uint16_t>(fui::InputTouch | fui::InputLongPress);
+    props.selectedIndex = static_cast<int16_t>(selectedLogicalIndex());
+    props.labelText.font = fui::GfxRendererTarget::FONT_BODY;
+    props.altText.font = fui::GfxRendererTarget::FONT_SMALL;
+    props.gap = static_cast<int16_t>(metrics.keyboardKeySpacing);
+    props.padding = fui::Insets{0, 0, 0, 0};
+    props.bottomHitOverflow = 0;
+    fui::keyboard(frame, kbRect, props);
+    interactions.publish();
+    interactionsReady = true;
+
+    renderer.displayBuffer(HalDisplay::FAST_REFRESH);
+    return;
+  }
+
   renderer.clearScreen();
 
   const auto pageWidth = renderer.getScreenWidth();
