@@ -6,10 +6,15 @@
 #include <string>
 
 #include "ReaderActivity.h"
+#include "XtcReaderMenuActivity.h"
 
 class XtcReaderActivity final : public ReaderActivity {
   std::shared_ptr<Xtc> xtc;
   uint32_t currentPage = 0;
+  bool automaticPageTurnActive = false;
+  uint8_t selectedPageTurnOption = 0;
+  unsigned long lastPageTurnTime = 0;
+  unsigned long pageTurnDuration = 0;
 
   enum class StatusBarOverlayPosition { Bottom, Top };
   struct StatusBarInfo {
@@ -19,7 +24,10 @@ class XtcReaderActivity final : public ReaderActivity {
   };
 
   void renderPage();
+  void openReaderMenu();
   void openChapterSelection();
+  void onReaderMenuConfirm(XtcReaderMenuActivity::MenuAction action);
+  void toggleAutoPageTurn(uint8_t option);
   void renderStatusBarOverlay(GfxRenderer& renderer, StatusBarOverlayPosition position) const;
   StatusBarInfo getStatusBarInfo() const;
   void saveProgress() const;

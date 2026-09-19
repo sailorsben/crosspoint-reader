@@ -95,6 +95,14 @@ const fui::KeyboardKey URL_SNIP_BOTTOM[] = {UKS("abc", fui::KeyKind::Mode, fui::
                                             UKS("Del", fui::KeyKind::Delete, fui::QWERTY_KEY_BACKSPACE, 2),
                                             UKS("OK", fui::KeyKind::Ok, fui::QWERTY_KEY_ENTER, 2)};
 
+// Compact 3x4 keypad for bounded numeric entry such as XTC page jumps.
+const fui::KeyboardKey NUMBER_ROW1[] = {UK("1", "1", '1'), UK("2", "2", '2'), UK("3", "3", '3')};
+const fui::KeyboardKey NUMBER_ROW2[] = {UK("4", "4", '4'), UK("5", "5", '5'), UK("6", "6", '6')};
+const fui::KeyboardKey NUMBER_ROW3[] = {UK("7", "7", '7'), UK("8", "8", '8'), UK("9", "9", '9')};
+const fui::KeyboardKey NUMBER_BOTTOM[] = {UKS("Del", fui::KeyKind::Delete, fui::QWERTY_KEY_BACKSPACE, 1),
+                                          UK("0", "0", '0'),
+                                          UKS("OK", fui::KeyKind::Ok, fui::QWERTY_KEY_ENTER, 1)};
+
 #undef UK
 #undef UKA
 #undef UKW
@@ -110,6 +118,9 @@ const fui::KeyboardRow URL_SNIP_ROWS[] = {
 const fui::KeyboardLayout URL_LAYOUT{URL_ROWS, 5};
 const fui::KeyboardLayout URL_SHIFT_LAYOUT{URL_SHIFT_ROWS, 5};
 const fui::KeyboardLayout URL_SNIPPET_LAYOUT{URL_SNIP_ROWS, 4};
+const fui::KeyboardRow NUMBER_ROWS[] = {
+    {NUMBER_ROW1, 3, 0}, {NUMBER_ROW2, 3, 0}, {NUMBER_ROW3, 3, 0}, {NUMBER_BOTTOM, 3, 0}};
+const fui::KeyboardLayout NUMBER_LAYOUT{NUMBER_ROWS, 4};
 
 }  // namespace
 
@@ -147,6 +158,7 @@ void KeyboardEntryActivity::onEnter() {
 void KeyboardEntryActivity::onExit() { Activity::onExit(); }
 
 const fui::KeyboardLayout& KeyboardEntryActivity::currentLayout() const {
+  if (inputType == InputType::Number) return NUMBER_LAYOUT;
   if (symbols) return fui::builtinKeyboardLayout(layoutId, shifted, true);
   if (inputType == InputType::Url) {
     if (urlPanel) return URL_SNIPPET_LAYOUT;
@@ -905,6 +917,8 @@ void KeyboardEntryActivity::render(RenderLock&&) {
   int tipCount = 0;
   if (cursorMode) {
     tipCount = 1;
+  } else if (inputType == InputType::Number) {
+    tipCount = !text.empty() ? 1 : 0;
   } else if (urlPanel) {
     tipCount = 1 + (!text.empty() ? 1 : 0);
   } else if (symbols) {
@@ -919,6 +933,8 @@ void KeyboardEntryActivity::render(RenderLock&&) {
     y += tipsLh;
     if (cursorMode) {
       drawTip(tr(STR_KB_HINT_RETURN_KEYBOARD), y);
+    } else if (inputType == InputType::Number) {
+      if (!text.empty()) drawTip(tr(STR_KB_HINT_CLEAR_TEXT), y);
     } else if (urlPanel) {
       drawTip(tr(STR_KB_HINT_EXIT_URL_MODE), y);
       y += tipsLh;
@@ -977,8 +993,10 @@ void KeyboardEntryActivity::render(RenderLock&&) {
   props.inputMask = static_cast<uint16_t>(fui::InputTouch | fui::InputLongPress);
   props.selectedIndex = cursorMode ? -1 : static_cast<int16_t>(selectedLogicalIndex());
   // The 12-column Arabic rows need the smaller font for wide isolated letters.
-  props.labelText.font = layoutId == fui::KeyboardLayoutId::ArabicAr && !symbols ? fui::GfxRendererTarget::FONT_SMALL
-                                                                                 : fui::GfxRendererTarget::FONT_BODY;
+  props.labelText.font =
+      inputType != InputType::Number && layoutId == fui::KeyboardLayoutId::ArabicAr && !symbols
+          ? fui::GfxRendererTarget::FONT_SMALL
+          : fui::GfxRendererTarget::FONT_BODY;
   props.altText.font = fui::GfxRendererTarget::FONT_SMALL;
   props.gap = static_cast<int16_t>(metrics.keyboardKeySpacing);
   props.padding = fui::Insets{0, 0, 0, 0};

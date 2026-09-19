@@ -8,11 +8,17 @@
 
 #include <algorithm>
 
+namespace {
+constexpr int PAGE_TURN_RATES[] = {0, 1, 3, 6, 12};
+}
+
 #include "CrossPointSettings.h"
 #include "ProgressFile.h"
 #include "ReaderActivity.h"
 #include "ReaderUtils.h"
 #include "XtcReaderChapterSelectionActivity.h"
+#include "XtcReaderMenuActivity.h"
+#include "activities/util/KeyboardEntryActivity.h"
 #include "components/UITheme.h"
 #include "fontIds.h"
 
@@ -32,6 +38,28 @@ bool XtcReaderActivity::loadBook() {
   return true;
 }
 
+void XtcReaderActivity::openReaderMenu() {
+  if (!xtc) return;
+
+  const bool hasChapters = xtc->hasChapters() && !xtc->getChapters().empty();
+  auto menu = makeUniqueNoThrow<XtcReaderMenuActivity>(renderer, mappedInput, xtc->getTitle(), currentPage,
+                                                       xtc->getPageCount(), hasChapters, selectedPageTurnOption);
+  if (!menu) {
+    LOG_ERR("XTR", "OOM: XTC reader menu");
+    return;
+  }
+
+  startActivityForResult(std::move(menu), [this](const ActivityResult& result) {
+    const auto* menuResult = std::get_if<MenuResult>(&result.data);
+    if (!menuResult) return;
+
+    toggleAutoPageTurn(menuResult->pageTurnOption);
+    if (!result.isCancelled && menuResult->action >= 0) {
+      onReaderMenuConfirm(static_cast<XtcReaderMenuActivity::MenuAction>(menuResult->action));
+    }
+  });
+}
+
 void XtcReaderActivity::openChapterSelection() {
   if (xtc && xtc->hasChapters() && !xtc->getChapters().empty()) {
     startActivityForResult(std::make_unique<XtcReaderChapterSelectionActivity>(renderer, mappedInput, xtc, currentPage),
@@ -45,17 +73,100 @@ void XtcReaderActivity::openChapterSelection() {
 }
 
 bool XtcReaderActivity::handleFormatInput() {
-  if (!xtc) {
-    return false;
+  if (!xtc) return false;
+
+  if (automaticPageTurnActive && pageTurnDuration > 0 && millis() - lastPageTurnTime >= pageTurnDuration) {
+    if (pageTurn(true)) {
+      lastPageTurnTime = millis();
+      requestUpdate();
+    } else {
+      automaticPageTurnActive = false;
+      selectedPageTurnOption = 0;
+    }
+    return true;
   }
 
-  // Enter chapter selection activity on Confirm release or touch menu gesture
+  // VesperUI/full-screen reader menu rather than jumping directly to chapters.
   if (mappedInput.wasReleased(MappedInputManager::Button::Confirm) ||
       ReaderUtils::isTouchMenuGesture(renderer, mappedInput, tapInputOrientation())) {
-    openChapterSelection();
+    openReaderMenu();
     return true;
   }
   return false;
+}
+
+void XtcReaderActivity::onReaderMenuConfirm(const XtcReaderMenuActivity::MenuAction action) {
+  if (!xtc) return;
+
+  switch (action) {
+    case XtcReaderMenuActivity::MenuAction::GO_TO_PAGE: {
+      const uint32_t pageCount = xtc->getPageCount();
+      if (pageCount == 0) return;
+      const size_t maxLength = std::to_string(static_cast<unsigned long>(pageCount)).length();
+      const uint32_t displayPage = std::min(currentPage + 1, pageCount);
+      auto keyboard = makeUniqueNoThrow<KeyboardEntryActivity>(
+          renderer, mappedInput, tr(STR_GO_TO_PAGE), std::to_string(static_cast<unsigned long>(displayPage)), maxLength,
+          InputType::Number);
+      if (!keyboard) {
+        LOG_ERR("XTR", "OOM: Go to Page keyboard");
+        return;
+      }
+
+      startActivityForResult(std::move(keyboard), [this, pageCount](const ActivityResult& result) {
+        if (result.isCancelled) {
+          requestUpdate();
+          return;
+        }
+        const auto* keyboardResult = std::get_if<KeyboardResult>(&result.data);
+        if (!keyboardResult || keyboardResult->text.empty()) {
+          requestUpdate();
+          return;
+        }
+
+        uint32_t page = 0;
+        for (const char ch : keyboardResult->text) {
+          if (ch < '0' || ch > '9') return;
+          page = page * 10 + static_cast<uint32_t>(ch - '0');
+        }
+        page = std::clamp(page, 1u, pageCount);
+        currentPage = page - 1;
+        requestUpdate();
+      });
+      break;
+    }
+    case XtcReaderMenuActivity::MenuAction::SELECT_CHAPTER:
+      openChapterSelection();
+      break;
+    case XtcReaderMenuActivity::MenuAction::AUTO_PAGE_TURN:
+      // The menu popup already updated selectedPageTurnOption; the result
+      // handler applies it before dispatching this action.
+      break;
+    case XtcReaderMenuActivity::MenuAction::GO_HOME:
+      onGoHome();
+      break;
+    case XtcReaderMenuActivity::MenuAction::DELETE_CACHE: {
+      const uint32_t page = currentPage;
+      if (xtc->clearCache()) {
+        xtc->setupCacheDir();
+        currentPage = page;
+        saveProgress();
+      }
+      requestUpdate();
+      break;
+    }
+  }
+}
+
+void XtcReaderActivity::toggleAutoPageTurn(const uint8_t option) {
+  selectedPageTurnOption = option;
+  if (option == 0 || option >= std::size(PAGE_TURN_RATES) || PAGE_TURN_RATES[option] <= 0) {
+    automaticPageTurnActive = false;
+    pageTurnDuration = 0;
+    return;
+  }
+  pageTurnDuration = (60UL * 1000UL) / static_cast<unsigned long>(PAGE_TURN_RATES[option]);
+  lastPageTurnTime = millis();
+  automaticPageTurnActive = true;
 }
 
 void XtcReaderActivity::applyInitialOrientation() { renderer.setOrientation(GfxRenderer::Orientation::Portrait); }
