@@ -75,7 +75,8 @@ struct TouchPageTurn {
   unsigned long heldMs;
 };
 
-inline TouchPageTurn detectTouchPageTurn(const GfxRenderer& renderer, const MappedInputManager& input) {
+inline TouchPageTurn detectTouchPageTurn(const GfxRenderer& renderer, const MappedInputManager& input,
+                                         const GfxRenderer::Orientation tapOrientation) {
   TouchPageTurn result{false, false, 0};
   if (!SETTINGS.touchReaderControls || !input.hasTouch()) {
     return result;
@@ -95,12 +96,12 @@ inline TouchPageTurn detectTouchPageTurn(const GfxRenderer& renderer, const Mapp
 
   int x = 0;
   int y = 0;
-  if (!input.wasScreenTapped(x, y)) {
+  if (!input.wasScreenTappedForOrientation(x, y, tapOrientation)) {
     return result;
   }
 
-  const int16_t width = static_cast<int16_t>(renderer.getScreenWidth());
-  const int16_t height = static_cast<int16_t>(renderer.getScreenHeight());
+  const int16_t width = static_cast<int16_t>(renderer.getScreenWidthForOrientation(tapOrientation));
+  const int16_t height = static_cast<int16_t>(renderer.getScreenHeightForOrientation(tapOrientation));
   // Outer thirds only: the center column contains the reader-menu tap target
   // (isTouchMenuTap below), so it must not double as a page turn.
   const int16_t zoneWidth = width / 3;
@@ -121,29 +122,39 @@ inline TouchPageTurn detectTouchPageTurn(const GfxRenderer& renderer, const Mapp
   return result;
 }
 
+inline TouchPageTurn detectTouchPageTurn(const GfxRenderer& renderer, const MappedInputManager& input) {
+  return detectTouchPageTurn(renderer, input, renderer.getOrientation());
+}
+
 // Tap in the center third of the screen: the tap path into the reader menu on
 // every touch board. The page-turn tap zones are the outer horizontal thirds,
 // so the centered rectangle remains free in tap mode. The Off/Swipe Up
 // alternatives are only surfaced on home-key boards (SettingsList), where the
 // menu stays reachable through the key's long-press function.
-inline bool isTouchMenuTap(const GfxRenderer& renderer, const MappedInputManager& input) {
+inline bool isTouchMenuTap(const GfxRenderer& renderer, const MappedInputManager& input,
+                           const GfxRenderer::Orientation tapOrientation) {
   if (!input.hasTouch()) return false;
   if (SETTINGS.showReaderMenu != CrossPointSettings::READER_MENU_TAP) return false;
   int x = 0;
   int y = 0;
-  if (!input.wasScreenTapped(x, y)) return false;
-  const int width = renderer.getScreenWidth();
-  const int height = renderer.getScreenHeight();
+  if (!input.wasScreenTappedForOrientation(x, y, tapOrientation)) return false;
+  const int width = renderer.getScreenWidthForOrientation(tapOrientation);
+  const int height = renderer.getScreenHeightForOrientation(tapOrientation);
   const int zoneWidth = width / 3;
   const int zoneHeight = height / 3;
   return x >= zoneWidth && x < width - zoneWidth && y >= zoneHeight && y < height - zoneHeight;
+}
+
+inline bool isTouchMenuTap(const GfxRenderer& renderer, const MappedInputManager& input) {
+  return isTouchMenuTap(renderer, input, renderer.getOrientation());
 }
 
 // Reader menu opens on the menu edge-swipe or a center-third tap. Home-key
 // actions are configured separately from screen gestures.
 // Menu gestures honor showReaderMenu independently of touchReaderControls,
 // which only gates page-turn touch zones in detectTouchPageTurn().
-inline bool isTouchMenuGesture(const GfxRenderer& renderer, const MappedInputManager& input) {
+inline bool isTouchMenuGesture(const GfxRenderer& renderer, const MappedInputManager& input,
+                               const GfxRenderer::Orientation tapOrientation) {
   if (!input.hasTouch()) return false;
   if (input.wasMenuGesture()) return true;
   // Bottom-edge up-swipe variant: only selectable on home-key boards, where
@@ -151,7 +162,11 @@ inline bool isTouchMenuGesture(const GfxRenderer& renderer, const MappedInputMan
   if (SETTINGS.showReaderMenu == CrossPointSettings::READER_MENU_SWIPE_UP && input.wasReaderMenuSwipeUp()) {
     return true;
   }
-  return isTouchMenuTap(renderer, input);
+  return isTouchMenuTap(renderer, input, tapOrientation);
+}
+
+inline bool isTouchMenuGesture(const GfxRenderer& renderer, const MappedInputManager& input) {
+  return isTouchMenuGesture(renderer, input, renderer.getOrientation());
 }
 
 // One helper, blocking or deferred: the async form starts the refresh and

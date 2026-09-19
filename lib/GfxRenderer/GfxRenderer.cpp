@@ -1846,8 +1846,10 @@ std::vector<std::string> GfxRenderer::wrappedText(const int fontId, const char* 
 }
 
 // Note: Internal driver treats screen in command orientation; this library exposes a logical orientation
-int GfxRenderer::getScreenWidth() const {
-  switch (orientation) {
+int GfxRenderer::getScreenWidth() const { return getScreenWidthForOrientation(orientation); }
+
+int GfxRenderer::getScreenWidthForOrientation(const Orientation logicalOrientation) const {
+  switch (logicalOrientation) {
     case Portrait:
     case PortraitInverted:
       // 480px wide in portrait logical coordinates
@@ -1860,8 +1862,10 @@ int GfxRenderer::getScreenWidth() const {
   return panelHeight;
 }
 
-int GfxRenderer::getScreenHeight() const {
-  switch (orientation) {
+int GfxRenderer::getScreenHeight() const { return getScreenHeightForOrientation(orientation); }
+
+int GfxRenderer::getScreenHeightForOrientation(const Orientation logicalOrientation) const {
+  switch (logicalOrientation) {
     case Portrait:
     case PortraitInverted:
       // 800px tall in portrait logical coordinates
@@ -1875,6 +1879,11 @@ int GfxRenderer::getScreenHeight() const {
 }
 
 void GfxRenderer::tapToLogical(float nx, float ny, int& outX, int& outY) const {
+  tapToLogicalForOrientation(nx, ny, orientation, outX, outY);
+}
+
+void GfxRenderer::tapToLogicalForOrientation(float nx, float ny, const Orientation logicalOrientation, int& outX,
+                                             int& outY) const {
   int phyX = static_cast<int>(nx * panelWidth);
   int phyY = static_cast<int>(ny * panelHeight);
   if (phyX < 0) phyX = 0;
@@ -1882,7 +1891,7 @@ void GfxRenderer::tapToLogical(float nx, float ny, int& outX, int& outY) const {
   if (phyY < 0) phyY = 0;
   if (phyY > panelHeight - 1) phyY = panelHeight - 1;
 
-  switch (orientation) {
+  switch (logicalOrientation) {
     case Portrait:
       outX = panelHeight - 1 - phyY;
       outY = phyX;

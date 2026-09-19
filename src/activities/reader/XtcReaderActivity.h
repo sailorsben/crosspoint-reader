@@ -32,6 +32,7 @@ class XtcReaderActivity final : public ReaderActivity {
   bool handleFormatInput() override;
   void renderBook() override;
   void applyInitialOrientation() override;
+  GfxRenderer::Orientation tapInputOrientation() const override;
 
  public:
   explicit XtcReaderActivity(GfxRenderer& renderer, MappedInputManager& mappedInput, std::string bookPath,

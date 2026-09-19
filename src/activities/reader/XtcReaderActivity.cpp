@@ -51,7 +51,7 @@ bool XtcReaderActivity::handleFormatInput() {
 
   // Enter chapter selection activity on Confirm release or touch menu gesture
   if (mappedInput.wasReleased(MappedInputManager::Button::Confirm) ||
-      ReaderUtils::isTouchMenuGesture(renderer, mappedInput)) {
+      ReaderUtils::isTouchMenuGesture(renderer, mappedInput, tapInputOrientation())) {
     openChapterSelection();
     return true;
   }
@@ -59,6 +59,20 @@ bool XtcReaderActivity::handleFormatInput() {
 }
 
 void XtcReaderActivity::applyInitialOrientation() { renderer.setOrientation(GfxRenderer::Orientation::Portrait); }
+
+GfxRenderer::Orientation XtcReaderActivity::tapInputOrientation() const {
+  switch (SETTINGS.xtcTapProfile) {
+    case CrossPointSettings::XTC_TAP_LANDSCAPE_CW:
+      return GfxRenderer::Orientation::LandscapeClockwise;
+    case CrossPointSettings::XTC_TAP_INVERTED:
+      return GfxRenderer::Orientation::PortraitInverted;
+    case CrossPointSettings::XTC_TAP_LANDSCAPE_CCW:
+      return GfxRenderer::Orientation::LandscapeCounterClockwise;
+    case CrossPointSettings::XTC_TAP_PORTRAIT:
+    default:
+      return GfxRenderer::Orientation::Portrait;
+  }
+}
 
 void XtcReaderActivity::renderBook() {
   if (!xtc) {

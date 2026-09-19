@@ -73,6 +73,16 @@ class CrossPointSettings : public PersistableStore<CrossPointSettings> {
     ORIENTATION_COUNT
   };
 
+  // XTC pages stay in their pre-rendered framebuffer layout; this profile
+  // controls only how reader taps are interpreted while an XTC page is shown.
+  enum XTC_TAP_PROFILE {
+    XTC_TAP_PORTRAIT = 0,
+    XTC_TAP_LANDSCAPE_CW = 1,
+    XTC_TAP_INVERTED = 2,
+    XTC_TAP_LANDSCAPE_CCW = 3,
+    XTC_TAP_PROFILE_COUNT
+  };
+
   // Front button layout options (legacy)
   // Default: Back, Confirm, Left, Right
   // Swapped: Left, Right, Back, Confirm
@@ -328,6 +338,8 @@ class CrossPointSettings : public PersistableStore<CrossPointSettings> {
   uint8_t tiltPageTurn = TILT_OFF;
   // Touch screen reader zones/gestures on boards with a touch controller.
   uint8_t touchReaderControls = TOUCH_READER_SWIPE;
+  // Physical orientation used to interpret taps while an XTC page is shown.
+  uint8_t xtcTapProfile = XTC_TAP_PORTRAIT;
   // Reader menu open gesture (SHOW_READER_MENU: off / center tap / bottom-edge
   // up-swipe). Only surfaced on home-key boards, where Home is the capacitive
   // key and the bottom edge is free; elsewhere it stays at the Tap default.
