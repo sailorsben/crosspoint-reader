@@ -32,6 +32,7 @@ class XtcReaderMenuActivity final : public UiListActivity {
   void buildMenuItems(bool hasChapters);
   void buildMenuRows();
   void closeCancelled();
+  Rect menuRect() const;
 
   int listCount() const override { return static_cast<int>(menuItems.size()); }
   void buildScreen(UiScreen& screen) override;

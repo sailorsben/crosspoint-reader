@@ -89,13 +89,34 @@ bool XtcReaderMenuActivity::handleButtons() {
   return false;
 }
 
+Rect XtcReaderMenuActivity::menuRect() const {
+  const int screenW = renderer.getScreenWidth();
+  const int screenH = renderer.getScreenHeight();
+  const bool landscape = screenW > screenH;
+
+  if (landscape) {
+    constexpr int width = 640;
+    constexpr int height = 366;
+    return Rect{(screenW - width) / 2, (screenH - height) / 2, width, height};
+  }
+
+  constexpr int marginX = 20;
+  constexpr int marginY = 60;
+  return Rect{marginX, marginY, screenW - marginX * 2, screenH - marginY * 2};
+}
+
 void XtcReaderMenuActivity::buildScreen(UiScreen& screen) {
   const auto& metrics = UITheme::getInstance().getMetrics();
-  const Rect safe = UITheme::getInstance().getScreenSafeArea(renderer, true, false);
+  const Rect modal = menuRect();
+  const int screenW = renderer.getScreenWidth();
+  const int screenH = renderer.getScreenHeight();
+  const int inset = screenW > screenH ? 16 : 14;
+  const int headerHeight = screenW > screenH ? 50 : 58;
+
   screen.setContentMarginFromScreen(fui::Insets{
-      static_cast<int16_t>(safe.y + metrics.topPadding + metrics.headerHeight),
-      static_cast<int16_t>(renderer.getScreenWidth() - (safe.x + safe.width)),
-      static_cast<int16_t>(renderer.getScreenHeight() - (safe.y + safe.height)), static_cast<int16_t>(safe.x)});
+      static_cast<int16_t>(modal.y + headerHeight),
+      static_cast<int16_t>(screenW - (modal.x + modal.width) + inset),
+      static_cast<int16_t>(screenH - (modal.y + modal.height) + inset), static_cast<int16_t>(modal.x + inset)});
 
   char progress[32];
   snprintf(progress, sizeof(progress), "%lu / %lu", static_cast<unsigned long>(currentPage + 1),
@@ -122,17 +143,29 @@ void XtcReaderMenuActivity::buildScreen(UiScreen& screen) {
 }
 
 void XtcReaderMenuActivity::drawChrome() {
-  const auto& metrics = UITheme::getInstance().getMetrics();
-  const Rect safe = UITheme::getInstance().getScreenSafeArea(renderer, true, false);
-  GUI.drawHeader(renderer, Rect{safe.x, safe.y + metrics.topPadding, safe.width, metrics.headerHeight},
-                 title.empty() ? tr(STR_READER_MENU) : title.c_str());
+  const Rect modal = menuRect();
+  const bool landscape = renderer.getScreenWidth() > renderer.getScreenHeight();
+  const int headerHeight = landscape ? 50 : 58;
+
+  // True overlay: preserve the book page around the menu and only paint the
+  // modal itself. The page framebuffer is still present when this activity is
+  // pushed, even though the logical UI orientation may have changed.
+  renderer.fillRect(modal.x, modal.y, modal.width, modal.height, false);
+  renderer.drawRect(modal.x, modal.y, modal.width, modal.height, 2, true);
+
+  const char* header = tr(STR_READER_MENU);
+  const int headerWidth = renderer.getTextWidth(UI_12_FONT_ID, header, EpdFontFamily::BOLD);
+  const int headerX = modal.x + (modal.width - headerWidth) / 2;
+  const int headerY =
+      modal.y + (headerHeight - renderer.getLineHeight(UI_12_FONT_ID)) / 2 - (landscape ? 1 : 0);
+  renderer.drawText(UI_12_FONT_ID, headerX, headerY, header, true, EpdFontFamily::BOLD);
+  renderer.drawLine(modal.x + 12, modal.y + headerHeight - 1, modal.x + modal.width - 13,
+                    modal.y + headerHeight - 1);
 }
 
 void XtcReaderMenuActivity::render(RenderLock&&) {
   if (optionPopup.processRender(renderer, mappedInput)) return;
-  renderer.clearScreen();
   drawChrome();
   renderUi();
-  drawFooter();
   renderer.displayBuffer();
 }
