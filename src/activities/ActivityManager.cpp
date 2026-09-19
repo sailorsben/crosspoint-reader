@@ -94,10 +94,9 @@ void ActivityManager::loop() {
     currentActivity->applyDisplayOrientation();
 
     if (mappedInput.homeButtonAction() == HomeButtonAction::ToggleInterfaceOrientation) {
-      SETTINGS.interfaceOrientation =
-          SETTINGS.interfaceOrientation == CrossPointSettings::UI_PORTRAIT
-              ? CrossPointSettings::UI_LANDSCAPE_CW
-              : CrossPointSettings::UI_PORTRAIT;
+      SETTINGS.interfaceOrientation = SETTINGS.interfaceOrientation == CrossPointSettings::UI_PORTRAIT
+                                          ? CrossPointSettings::UI_LANDSCAPE_CW
+                                          : CrossPointSettings::UI_PORTRAIT;
       SETTINGS.saveToFile();
 
       // Reader pages own their own orientation. The setting still changes now

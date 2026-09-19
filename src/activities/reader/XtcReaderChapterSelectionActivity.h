@@ -5,6 +5,7 @@
 #include <vector>
 
 #include "activities/UiListActivity.h"
+#include "components/themes/BaseTheme.h"
 
 class XtcReaderChapterSelectionActivity final : public UiListActivity {
   std::shared_ptr<Xtc> xtc;

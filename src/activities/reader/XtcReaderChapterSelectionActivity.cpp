@@ -114,8 +114,7 @@ void XtcReaderChapterSelectionActivity::buildScreen(UiScreen& screen) {
   const int inset = 14;
 
   screen.setContentMarginFromScreen(fui::Insets{
-      static_cast<int16_t>(modal.y + headerHeight),
-      static_cast<int16_t>(screenW - (modal.x + modal.width) + inset),
+      static_cast<int16_t>(modal.y + headerHeight), static_cast<int16_t>(screenW - (modal.x + modal.width) + inset),
       static_cast<int16_t>(screenH - (modal.y + modal.height) + inset), static_cast<int16_t>(modal.x + inset)});
   screen.spacer(static_cast<int16_t>(metrics.verticalSpacing));
 
@@ -151,8 +150,7 @@ void XtcReaderChapterSelectionActivity::drawChrome() {
   const int headerX = modal.x + (modal.width - headerWidth) / 2;
   const int headerY = modal.y + (headerHeight - renderer.getLineHeight(UI_12_FONT_ID)) / 2;
   renderer.drawText(UI_12_FONT_ID, headerX, headerY, header, true, EpdFontFamily::BOLD);
-  renderer.drawLine(modal.x + 12, modal.y + headerHeight - 1, modal.x + modal.width - 13,
-                    modal.y + headerHeight - 1);
+  renderer.drawLine(modal.x + 12, modal.y + headerHeight - 1, modal.x + modal.width - 13, modal.y + headerHeight - 1);
 }
 
 void XtcReaderChapterSelectionActivity::render(RenderLock&&) {

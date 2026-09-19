@@ -163,8 +163,7 @@ void FrontlightPanelActivity::runTile(const int idx) {
     case 2:  // Cycle the active orientation
       if (SETTINGS.uiTheme == CrossPointSettings::UI_THEME::VESPERUI) {
         SETTINGS.interfaceOrientation =
-            static_cast<uint8_t>((SETTINGS.interfaceOrientation + 1) %
-                                 CrossPointSettings::INTERFACE_ORIENTATION_COUNT);
+            static_cast<uint8_t>((SETTINGS.interfaceOrientation + 1) % CrossPointSettings::INTERFACE_ORIENTATION_COUNT);
         SETTINGS.saveToFile();
         applyDisplayOrientation();
         resetUi();
@@ -396,11 +395,10 @@ void FrontlightPanelActivity::buildPanelScreen(UiScreen& screen) {
                                                     StrId::STR_ORIENTATION_INVERTED, StrId::STR_LANDSCAPE_CCW};
     static constexpr StrId kInterfaceOrientNames[CrossPointSettings::INTERFACE_ORIENTATION_COUNT] = {
         StrId::STR_PORTRAIT, StrId::STR_LANDSCAPE_CW, StrId::STR_LANDSCAPE_CCW};
-    const char* orientLabel =
-        SETTINGS.uiTheme == CrossPointSettings::UI_THEME::VESPERUI
-            ? I18N.get(kInterfaceOrientNames[SETTINGS.interfaceOrientation %
-                                            CrossPointSettings::INTERFACE_ORIENTATION_COUNT])
-            : I18N.get(kReaderOrientNames[SETTINGS.orientation % 4]);
+    const char* orientLabel = SETTINGS.uiTheme == CrossPointSettings::UI_THEME::VESPERUI
+                                  ? I18N.get(kInterfaceOrientNames[SETTINGS.interfaceOrientation %
+                                                                   CrossPointSettings::INTERFACE_ORIENTATION_COUNT])
+                                  : I18N.get(kReaderOrientNames[SETTINGS.orientation % 4]);
     // "Touch On" / "Touch Off", from the existing state strings: the label
     // names the current state of the touch-reader-controls setting.
     const bool touchOn = SETTINGS.touchReaderControls != CrossPointSettings::TOUCH_READER_OFF;

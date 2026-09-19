@@ -182,8 +182,8 @@ void drawLandscapeRecents(const GfxRenderer& renderer, const VesperHome::Layout&
     if (!book.author.empty()) {
       const std::string author =
           renderer.truncatedText(SMALL_FONT_ID, book.author.c_str(), card.width - 16, EpdFontFamily::REGULAR);
-      renderer.drawText(SMALL_FONT_ID, card.x + 8,
-                        card.y + card.height - renderer.getLineHeight(SMALL_FONT_ID) - 5, author.c_str());
+      renderer.drawText(SMALL_FONT_ID, card.x + 8, card.y + card.height - renderer.getLineHeight(SMALL_FONT_ID) - 5,
+                        author.c_str());
     }
   }
 }
