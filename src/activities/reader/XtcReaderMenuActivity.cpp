@@ -28,6 +28,7 @@ void XtcReaderMenuActivity::buildMenuItems(const bool hasChapters) {
   menuItems.push_back({MenuAction::GO_TO_PAGE, StrId::STR_GO_TO_PAGE});
   if (hasChapters) menuItems.push_back({MenuAction::SELECT_CHAPTER, StrId::STR_SELECT_CHAPTER});
   menuItems.push_back({MenuAction::AUTO_PAGE_TURN, StrId::STR_AUTO_TURN_PAGES_PER_MIN});
+  menuItems.push_back({MenuAction::IMMERSIVE_OPTIONS, StrId::STR_IMMERSIVE_OPTIONS});
   menuItems.push_back({MenuAction::GO_HOME, StrId::STR_GO_HOME_BUTTON});
   menuItems.push_back({MenuAction::DELETE_CACHE, StrId::STR_DELETE_CACHE});
 }

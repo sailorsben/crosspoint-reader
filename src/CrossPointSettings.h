@@ -332,6 +332,14 @@ class CrossPointSettings : public PersistableStore<CrossPointSettings> {
   // Focus Reading - emphasizes the first part of words with bold
   uint8_t focusReadingEnabled = 0;
   uint8_t readerMenuStyle = READER_MENU_LIST;
+  // VesperUI immersive reader footer. The content switches are independent;
+  // Immersion Mode changes their visibility policy from persistent to
+  // bottom-swipe reveal without changing the selected content.
+  uint8_t immersiveMode = 0;
+  uint8_t immersiveShowPages = 1;
+  uint8_t immersiveShowProgress = 1;
+  uint8_t immersiveShowPercentage = 1;
+  uint8_t immersiveShowBattery = 1;
   // SD card font family name (empty = use built-in fontFamily)
   char sdFontFamilyName[32] = "";
   // Dictionary folder name under /dictionaries (empty = no dictionary)

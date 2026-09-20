@@ -1,5 +1,7 @@
 #include "XtcReaderActivity.h"
 
+#include "ImmersiveOptionsActivity.h"
+
 #include <FsHelpers.h>
 #include <GfxRenderer.h>
 #include <HalStorage.h>
@@ -143,6 +145,10 @@ void XtcReaderActivity::onReaderMenuConfirm(const XtcReaderMenuActivity::MenuAct
     case XtcReaderMenuActivity::MenuAction::AUTO_PAGE_TURN:
       // The menu popup already updated selectedPageTurnOption; the result
       // handler applies it before dispatching this action.
+      break;
+    case XtcReaderMenuActivity::MenuAction::IMMERSIVE_OPTIONS:
+      startActivityForResult(std::make_unique<ImmersiveOptionsActivity>(renderer, mappedInput),
+                             [this](const ActivityResult&) { openReaderMenu(); });
       break;
     case XtcReaderMenuActivity::MenuAction::GO_HOME:
       onGoHome();

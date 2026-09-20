@@ -1,5 +1,7 @@
 #include "EpubReaderActivity.h"
 
+#include "ImmersiveOptionsActivity.h"
+
 #include <Epub/Page.h>
 #include <Epub/blocks/TextBlock.h>
 #include <FontCacheManager.h>
@@ -833,6 +835,26 @@ void EpubReaderActivity::onReaderMenuConfirm(EpubReaderMenuActivity::MenuAction 
       startActivityForResult(std::make_unique<TextSettingsActivity>(renderer, mappedInput, &sdFontSystem.registry(),
                                                                     TextSettingsActivity::Tab::Family),
                              [this](const ActivityResult&) {
+                               {
+                                 RenderLock lock;
+                                 if (section) {
+                                   rememberCurrentContentOffset();
+                                   cachedSpineIndex = currentSpineIndex;
+                                   cachedChapterTotalPageCount = section->pageCount;
+                                   nextPageNumber = section->currentPage;
+                                 }
+                                 section.reset();
+                               }
+                               openReaderMenu();
+                             });
+      break;
+    }
+    case EpubReaderMenuActivity::MenuAction::IMMERSIVE_OPTIONS: {
+      startActivityForResult(std::make_unique<ImmersiveOptionsActivity>(renderer, mappedInput),
+                             [this](const ActivityResult&) {
+                               // Persistent-footer changes alter the EPUB
+                               // viewport. Preserve the content anchor, drop the
+                               // old pagination and return to the reader menu.
                                {
                                  RenderLock lock;
                                  if (section) {

@@ -12,7 +12,7 @@
 
 class XtcReaderMenuActivity final : public UiListActivity {
  public:
-  enum class MenuAction { GO_TO_PAGE, SELECT_CHAPTER, AUTO_PAGE_TURN, GO_HOME, DELETE_CACHE };
+  enum class MenuAction { GO_TO_PAGE, SELECT_CHAPTER, AUTO_PAGE_TURN, IMMERSIVE_OPTIONS, GO_HOME, DELETE_CACHE };
 
   struct MenuItem {
     MenuAction action;
@@ -27,7 +27,7 @@ class XtcReaderMenuActivity final : public UiListActivity {
   bool handleHomeGesture() override;
 
  private:
-  static constexpr size_t MAX_MENU_ITEMS = 5;
+  static constexpr size_t MAX_MENU_ITEMS = 6;
 
   void buildMenuItems(bool hasChapters);
   void buildMenuRows();

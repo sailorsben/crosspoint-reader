@@ -383,6 +383,17 @@ inline std::vector<SettingInfo> getSettingsList(const SdCardFontRegistry* regist
 #endif
         SettingInfo::Toggle(StrId::STR_FRONTLIGHT, &CrossPointSettings::frontlightOn, "frontlightOn"),
 
+        // Vesper immersive-footer persistence. Category-less: these switches
+        // are edited from Reader Menu -> Immersive Options rather than the
+        // general Settings list.
+        SettingInfo::Toggle(StrId::STR_IMMERSION_MODE, &CrossPointSettings::immersiveMode, "immersiveMode"),
+        SettingInfo::Toggle(StrId::STR_PAGES, &CrossPointSettings::immersiveShowPages, "immersiveShowPages"),
+        SettingInfo::Toggle(StrId::STR_PROGRESS_BAR, &CrossPointSettings::immersiveShowProgress,
+                            "immersiveShowProgress"),
+        SettingInfo::Toggle(StrId::STR_PERCENTAGE, &CrossPointSettings::immersiveShowPercentage,
+                            "immersiveShowPercentage"),
+        SettingInfo::Toggle(StrId::STR_BATTERY, &CrossPointSettings::immersiveShowBattery, "immersiveShowBattery"),
+
         // --- KOReader Sync (web-only, uses KOReaderCredentialStore) ---
         SettingInfo::DynamicString(
             StrId::STR_KOREADER_USERNAME, [] { return KOREADER_STORE.getUsername(); },
