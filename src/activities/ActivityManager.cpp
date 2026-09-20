@@ -76,6 +76,10 @@ void ActivityManager::renderTaskLoop() {
   }
 }
 
+void ActivityManager::syncDisplayOrientationForInput() {
+  if (currentActivity) currentActivity->applyDisplayOrientation();
+}
+
 void ActivityManager::loop() {
   if (mappedInput.consumeSuppressedRelease()) return;
 
@@ -97,13 +101,6 @@ void ActivityManager::loop() {
     if (homeAction == HomeButtonAction::ToggleInterfaceOrientation ||
         homeAction == HomeButtonAction::ToggleReaderOrientation ||
         homeAction == HomeButtonAction::ToggleWholeDeviceOrientation) {
-      const auto rememberRendererLandscape = [this]() {
-        if (renderer.getOrientation() == GfxRenderer::Orientation::LandscapeCounterClockwise) {
-          SETTINGS.lastLandscapeOrientation = CrossPointSettings::LANDSCAPE_CCW;
-        } else if (renderer.getOrientation() == GfxRenderer::Orientation::LandscapeClockwise) {
-          SETTINGS.lastLandscapeOrientation = CrossPointSettings::LANDSCAPE_CW;
-        }
-      };
       const auto savedReaderLandscape = []() {
         return SETTINGS.lastLandscapeOrientation == CrossPointSettings::LANDSCAPE_CCW
                    ? CrossPointSettings::LANDSCAPE_CCW
@@ -152,10 +149,22 @@ void ActivityManager::loop() {
         return;
       }
 
-      const bool currentlyLandscape = renderer.getOrientation() == GfxRenderer::Orientation::LandscapeClockwise ||
-                                      renderer.getOrientation() == GfxRenderer::Orientation::LandscapeCounterClockwise;
+      const bool readerActive = currentActivity->isReaderActivity();
+      const bool currentlyLandscape =
+          readerActive ? (SETTINGS.orientation == CrossPointSettings::LANDSCAPE_CW ||
+                          SETTINGS.orientation == CrossPointSettings::LANDSCAPE_CCW)
+                       : (SETTINGS.interfaceOrientation == CrossPointSettings::UI_LANDSCAPE_CW ||
+                          SETTINGS.interfaceOrientation == CrossPointSettings::UI_LANDSCAPE_CCW);
       if (currentlyLandscape) {
-        rememberRendererLandscape();
+        if (readerActive) {
+          SETTINGS.lastLandscapeOrientation =
+              SETTINGS.orientation == CrossPointSettings::LANDSCAPE_CCW ? CrossPointSettings::LANDSCAPE_CCW
+                                                                         : CrossPointSettings::LANDSCAPE_CW;
+        } else {
+          SETTINGS.lastLandscapeOrientation =
+              SETTINGS.interfaceOrientation == CrossPointSettings::UI_LANDSCAPE_CCW ? CrossPointSettings::LANDSCAPE_CCW
+                                                                                      : CrossPointSettings::LANDSCAPE_CW;
+        }
         SETTINGS.orientation = CrossPointSettings::PORTRAIT;
         SETTINGS.interfaceOrientation = CrossPointSettings::UI_PORTRAIT;
       } else {

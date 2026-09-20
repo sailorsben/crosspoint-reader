@@ -587,6 +587,7 @@ void loop() {
   static unsigned long lastMemPrint = 0;
 
   gpio.setSharedConfirmPowerShortPressEmitsPower(SETTINGS.shortPwrBtn == CrossPointSettings::SHORT_PWRBTN::SLEEP);
+  activityManager.syncDisplayOrientationForInput();
   mappedInputManager.update();
 
   if (activityManager.requiresExclusiveStorageLoop()) {

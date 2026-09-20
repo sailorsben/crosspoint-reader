@@ -77,6 +77,11 @@ class ActivityManager {
   void begin();
   void loop();
 
+  // Input coordinates are normalized in the physical panel frame, then mapped
+  // through the renderer orientation. Sync the active activity's orientation
+  // before MappedInputManager samples a frame so visual top/left are authoritative.
+  void syncDisplayOrientationForInput();
+
   // Will replace currentActivity and drop all activities on stack
   void replaceActivity(std::unique_ptr<Activity>&& newActivity);
 

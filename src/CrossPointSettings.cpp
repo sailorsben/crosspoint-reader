@@ -218,7 +218,14 @@ bool CrossPointSettings::fromJson(JsonVariantConst doc) {
                                                   HomeButtonAction::Bookmark, HomeButtonAction::Dictionary,
                                                   HomeButtonAction::ReaderMenu};
     if (s.longPressMenuFunction < sizeof(LEGACY) / sizeof(LEGACY[0])) {
-      s.homeButtonLongPressAction = static_cast<uint8_t>(LEGACY[s.longPressMenuFunction]);
+      HomeButtonAction migrated = LEGACY[s.longPressMenuFunction];
+      // VesperUI introduced whole-device rotation as the useful default. An
+      // old explicit "Disabled" value should not silently turn that new
+      // long-press into a no-op, while real legacy shortcuts remain preserved.
+      if (s.uiTheme == VESPERUI && s.longPressMenuFunction == LP_MENU_DISABLED) {
+        migrated = HomeButtonAction::ToggleWholeDeviceOrientation;
+      }
+      s.homeButtonLongPressAction = static_cast<uint8_t>(migrated);
       needsResave = true;
     }
   }
