@@ -2,6 +2,8 @@
 
 #include <GfxRenderer.h>
 
+#include "components/themes/BaseTheme.h"
+
 class VesperReaderFooter {
  public:
   struct Data {
