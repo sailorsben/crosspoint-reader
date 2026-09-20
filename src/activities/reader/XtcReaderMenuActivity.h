@@ -19,7 +19,7 @@ class XtcReaderMenuActivity final : public UiListActivity {
     StrId labelId;
   };
 
-  explicit XtcReaderMenuActivity(GfxRenderer& renderer, MappedInputManager& mappedInput, std::string title,
+  explicit XtcReaderMenuActivity(GfxRenderer& renderer, MappedInputManager& mappedInput, std::string chapterTitle,
                                  uint32_t currentPage, uint32_t totalPages, bool hasChapters,
                                  uint8_t selectedPageTurnOption);
 
@@ -44,7 +44,7 @@ class XtcReaderMenuActivity final : public UiListActivity {
   std::vector<MenuItem> menuItems;
   std::array<freeink::ui::ListItem, MAX_MENU_ITEMS> menuRows{};
   OptionPopup optionPopup;
-  std::string title;
+  std::string chapterTitle;
   uint32_t currentPage = 0;
   uint32_t totalPages = 0;
   uint8_t selectedPageTurnOption = 0;

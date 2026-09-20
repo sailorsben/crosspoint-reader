@@ -43,6 +43,7 @@ class XtcReaderActivity final : public ReaderActivity {
   void applyInitialOrientation() override;
   GfxRenderer::Orientation tapInputOrientation() const override;
   void drawVesperFooter() const;
+  std::string currentChapterTitle() const;
 
  public:
   explicit XtcReaderActivity(GfxRenderer& renderer, MappedInputManager& mappedInput, std::string bookPath,

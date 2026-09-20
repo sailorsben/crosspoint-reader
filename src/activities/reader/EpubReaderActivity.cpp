@@ -44,6 +44,7 @@
 #include "SdCardFontSystem.h"
 #include "activities/settings/TextSettingsActivity.h"
 #include "components/UITheme.h"
+#include "components/VesperReaderFooter.h"
 #include "fontIds.h"
 #include "util/BookmarkUtil.h"
 #include "util/ButtonNavigator.h"
@@ -282,7 +283,7 @@ void EpubReaderActivity::openReaderMenu() {
   const int bookProgressPercent = bookPercentFor(position);
 
   startActivityForResult(
-      std::make_unique<EpubReaderMenuActivity>(renderer, mappedInput, epub->getTitle(), position.displayPage(),
+      std::make_unique<EpubReaderMenuActivity>(renderer, mappedInput, currentChapterTitle(), position.displayPage(),
                                                position.totalPages, bookProgressPercent, SETTINGS.orientation,
                                                !currentPageFootnotes.empty(), !cachedBookmarks.empty()),
       [this](const ActivityResult& result) {
@@ -422,6 +423,8 @@ void EpubReaderActivity::loop() {
   } else {
     pendingReadFolderMove = false;
   }
+
+  if (handleImmersiveFooterGesture()) return;
 
   const auto touch = ReaderUtils::detectTouchPageTurn(renderer, mappedInput);
 
@@ -1075,6 +1078,7 @@ bool EpubReaderActivity::pageTurn(bool isForwardTurn) {
     if (section->currentPage < section->pageCount - 1 || section->isBuilding()) {
       section->currentPage++;
       lastPageTurnTime = millis();
+      hideImmersiveFooterAfterTurn();
       return true;
     } else if (currentSpineIndex + 1 < epub->getSpineItemsCount()) {
       RenderLock lock;
@@ -1082,16 +1086,19 @@ bool EpubReaderActivity::pageTurn(bool isForwardTurn) {
       currentSpineIndex++;
       section.reset();
       lastPageTurnTime = millis();
+      hideImmersiveFooterAfterTurn();
       return true;
     } else {
       currentSpineIndex = epub->getSpineItemsCount();
       lastPageTurnTime = millis();
+      hideImmersiveFooterAfterTurn();
       return true;
     }
   } else {
     if (section->currentPage > 0) {
       section->currentPage--;
       lastPageTurnTime = millis();
+      hideImmersiveFooterAfterTurn();
       return true;
     } else if (currentSpineIndex > 0) {
       RenderLock lock;
@@ -1100,6 +1107,7 @@ bool EpubReaderActivity::pageTurn(bool isForwardTurn) {
       currentSpineIndex--;
       section.reset();
       lastPageTurnTime = millis();
+      hideImmersiveFooterAfterTurn();
       return true;
     }
   }
@@ -1177,9 +1185,13 @@ void EpubReaderActivity::renderBook() {
   orientedMarginLeft += SETTINGS.screenMargin;
   orientedMarginRight += SETTINGS.screenMargin;
 
-  const uint8_t statusBarHeight = UITheme::getInstance().getStatusBarHeight();
+  const bool vesperFooter =
+      SETTINGS.uiTheme == CrossPointSettings::UI_THEME::VESPERUI && VesperReaderFooter::hasContent();
+  const uint8_t statusBarHeight =
+      vesperFooter && SETTINGS.immersiveMode == 0 ? static_cast<uint8_t>(VesperReaderFooter::height())
+                                                 : UITheme::getInstance().getStatusBarHeight();
 
-  if (automaticPageTurnActive &&
+  if (!vesperFooter && automaticPageTurnActive &&
       (statusBarHeight == 0 || statusBarHeight == UITheme::getInstance().getProgressBarHeight())) {
     orientedMarginBottom +=
         std::max(SETTINGS.screenMargin,
@@ -1789,6 +1801,26 @@ void EpubReaderActivity::renderStatusBar() const {
   const float pageCount = section ? section->estimatedTotalPages() : 1;
   const float sectionChapterProg = (pageCount > 0) ? (static_cast<float>(currentPage) / pageCount) : 0;
   const float bookProgress = epub ? (epub->calculateProgress(currentSpineIndex, sectionChapterProg) * 100) : 0;
+
+  if (SETTINGS.uiTheme == CrossPointSettings::UI_THEME::VESPERUI) {
+    if (!immersiveFooterVisible() || !epub) return;
+
+    int totalBookPages = std::max(1, static_cast<int>(pageCount));
+    const size_t bookBytes = epub->getBookSize();
+    const size_t previousBytes =
+        currentSpineIndex > 0 ? epub->getCumulativeSpineItemSize(currentSpineIndex - 1) : 0;
+    const size_t currentBytes = epub->getCumulativeSpineItemSize(currentSpineIndex);
+    const size_t spineBytes = currentBytes > previousBytes ? currentBytes - previousBytes : 0;
+    if (bookBytes > 0 && spineBytes > 0 && pageCount > 0) {
+      totalBookPages = std::max(
+          1, static_cast<int>((static_cast<double>(bookBytes) * pageCount / static_cast<double>(spineBytes)) + 0.5));
+    }
+    const int percent = std::clamp(static_cast<int>(bookProgress + 0.5f), 0, 100);
+    const int wholePage =
+        std::clamp(static_cast<int>((static_cast<double>(percent) / 100.0) * totalBookPages + 0.5), 1, totalBookPages);
+    VesperReaderFooter::draw(renderer, {wholePage, totalBookPages, percent}, true);
+    return;
+  }
 
   std::string title;
   int textYOffset = 0;

@@ -10,11 +10,12 @@
 
 namespace fui = freeink::ui;
 
-XtcReaderMenuActivity::XtcReaderMenuActivity(GfxRenderer& renderer, MappedInputManager& mappedInput, std::string title,
+XtcReaderMenuActivity::XtcReaderMenuActivity(GfxRenderer& renderer, MappedInputManager& mappedInput,
+                                             std::string chapterTitle,
                                              const uint32_t currentPage, const uint32_t totalPages,
                                              const bool hasChapters, const uint8_t selectedPageTurnOption)
     : UiListActivity("XtcReaderMenu", renderer, mappedInput),
-      title(std::move(title)),
+      chapterTitle(std::move(chapterTitle)),
       currentPage(currentPage),
       totalPages(totalPages),
       selectedPageTurnOption(selectedPageTurnOption) {
@@ -118,13 +119,7 @@ void XtcReaderMenuActivity::buildScreen(UiScreen& screen) {
       static_cast<int16_t>(modal.y + headerHeight), static_cast<int16_t>(screenW - (modal.x + modal.width) + inset),
       static_cast<int16_t>(screenH - (modal.y + modal.height) + inset), static_cast<int16_t>(modal.x + inset)});
 
-  char progress[32];
-  snprintf(progress, sizeof(progress), "%lu / %lu", static_cast<unsigned long>(currentPage + 1),
-           static_cast<unsigned long>(totalPages));
-  fui::TextStyle summary = screen.theme().smallText;
-  summary.align = fui::TextAlign::Center;
-  screen.target().text(screen.takeTop(static_cast<int16_t>(metrics.tabBarHeight), metrics.verticalSpacing), progress,
-                       summary);
+  (void)metrics;
 
   for (size_t i = 0; i < menuItems.size(); i++) {
     if (menuItems[i].action == MenuAction::AUTO_PAGE_TURN) {
@@ -152,6 +147,16 @@ void XtcReaderMenuActivity::drawChrome() {
   // pushed, even though the logical UI orientation may have changed.
   renderer.fillRect(modal.x, modal.y, modal.width, modal.height, false);
   renderer.drawRect(modal.x, modal.y, modal.width, modal.height, 2, true);
+
+  if (!chapterTitle.empty()) {
+    const int maxW = renderer.getScreenWidth() - 40;
+    const std::string chapter =
+        renderer.truncatedText(UI_10_FONT_ID, chapterTitle.c_str(), maxW, EpdFontFamily::BOLD);
+    const int cw = renderer.getTextWidth(UI_10_FONT_ID, chapter.c_str(), EpdFontFamily::BOLD);
+    renderer.fillRect(0, 0, renderer.getScreenWidth(), 30, false);
+    renderer.drawText(UI_10_FONT_ID, (renderer.getScreenWidth() - cw) / 2, 5, chapter.c_str(), true,
+                      EpdFontFamily::BOLD);
+  }
 
   const char* header = tr(STR_READER_MENU);
   const int headerWidth = renderer.getTextWidth(UI_12_FONT_ID, header, EpdFontFamily::BOLD);

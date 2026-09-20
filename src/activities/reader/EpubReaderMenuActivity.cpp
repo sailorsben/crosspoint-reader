@@ -12,11 +12,12 @@
 namespace fui = freeink::ui;
 
 EpubReaderMenuActivity::EpubReaderMenuActivity(GfxRenderer& renderer, MappedInputManager& mappedInput,
-                                               const std::string& title, const int currentPage, const int totalPages,
-                                               const int bookProgressPercent, const uint8_t currentOrientation,
+                                               const std::string& chapterTitle, const int currentPage,
+                                               const int totalPages, const int bookProgressPercent,
+                                               const uint8_t currentOrientation,
                                                const bool hasFootnotes, const bool hasBookmarks)
     : UiListActivity("EpubReaderMenu", renderer, mappedInput),
-      title(title),
+      chapterTitle(chapterTitle),
       pendingOrientation(currentOrientation),
       currentPage(currentPage),
       totalPages(totalPages),
@@ -149,29 +150,28 @@ bool EpubReaderMenuActivity::handleButtons() {
   return false;
 }
 
+Rect EpubReaderMenuActivity::menuRect() const {
+  const int sw = renderer.getScreenWidth();
+  const int sh = renderer.getScreenHeight();
+  const bool landscape = sw > sh;
+  const int width = landscape ? std::min(650, sw - 44) : sw - 28;
+  const int height = landscape ? std::min(370, sh - 54) : std::min(650, sh - 90);
+  return Rect{(sw - width) / 2, (sh - height) / 2 + 12, width, height};
+}
+
 void EpubReaderMenuActivity::buildScreen(UiScreen& screen) {
-  const auto& metrics = UITheme::getInstance().getMetrics();
-  const Rect safe = UITheme::getInstance().getScreenSafeArea(renderer, true, false);
-  // Content: the safe area minus the header band GUI.drawHeader paints.
-  screen.setContentMarginFromScreen(fui::Insets{
-      static_cast<int16_t>(safe.y + metrics.topPadding + metrics.headerHeight),
-      static_cast<int16_t>(renderer.getScreenWidth() - (safe.x + safe.width)),
-      static_cast<int16_t>(renderer.getScreenHeight() - (safe.y + safe.height)), static_cast<int16_t>(safe.x)});
+  const Rect modal = menuRect();
+  const int sw = renderer.getScreenWidth();
+  const int sh = renderer.getScreenHeight();
+  constexpr int headerHeight = 50;
+  constexpr int inset = 14;
 
-  // Progress summary where the old sub-header band sat.
-  std::string progressLine;
-  if (totalPages > 0) {
-    progressLine = std::string(tr(STR_CHAPTER_PREFIX)) + std::to_string(currentPage) + "/" +
-                   std::to_string(totalPages) + std::string(tr(STR_PAGES_SEPARATOR));
-  }
-  progressLine += std::string(tr(STR_BOOK_PREFIX)) + std::to_string(bookProgressPercent) + "%";
-  const fui::Rect band = screen.takeTop(static_cast<int16_t>(metrics.tabBarHeight));
-  const int16_t pad = screen.theme().headerSidePadding;
-  screen.target().text(band.inset(fui::Insets{0, pad, 0, pad}), progressLine.c_str(), screen.theme().smallText);
-  screen.spacer(static_cast<int16_t>(metrics.verticalSpacing));
+  screen.setContentMarginFromScreen(
+      fui::Insets{static_cast<int16_t>(modal.y + headerHeight),
+                  static_cast<int16_t>(sw - (modal.x + modal.width) + inset),
+                  static_cast<int16_t>(sh - (modal.y + modal.height) + inset),
+                  static_cast<int16_t>(modal.x + inset)});
 
-  // menuRowItems's labels/actionValue were set once in the constructor (see
-  // buildMenuRowItems()); only rows with live values need refreshing here.
   for (size_t i = 0; i < menuItems.size(); i++) {
     const auto action = menuItems[i].action;
     if (action == MenuAction::ROTATE_SCREEN) {
@@ -189,10 +189,8 @@ void EpubReaderMenuActivity::buildScreen(UiScreen& screen) {
   props.items = menuRowItems;
   props.count = static_cast<uint16_t>(menuItems.size());
   props.action = ACTION_ROW;
-  props.inputMask = fui::InputTouch;  // physical buttons stay in loop()
-  props.valueInset = 8;               // air between the value and the row edge
-  // Label at the value's font size: both sides of the row read as one unit.
-  // maxLines=2 also marks the style caller-owned (see textStyleUnset).
+  props.inputMask = fui::InputTouch;
+  props.valueInset = 8;
   props.labelText = screen.theme().smallText;
   props.labelText.maxLines = 2;
   syncListViewport(screen, props);
@@ -200,23 +198,33 @@ void EpubReaderMenuActivity::buildScreen(UiScreen& screen) {
 }
 
 void EpubReaderMenuActivity::drawChrome() {
-  const auto& metrics = UITheme::getInstance().getMetrics();
-  const Rect screen = UITheme::getInstance().getScreenSafeArea(renderer, true, false);
+  const Rect modal = menuRect();
+  constexpr int headerHeight = 50;
+  renderer.fillRect(modal.x, modal.y, modal.width, modal.height, false);
+  renderer.drawRect(modal.x, modal.y, modal.width, modal.height, 2, true);
 
-  // Header via GUI.drawHeader (already FreeInkUI-themed) for the battery
-  // indicator; the rest of the screen renders through the app.
-  GUI.drawHeader(renderer, Rect{screen.x, screen.y + metrics.topPadding, screen.width, metrics.headerHeight},
-                 title.c_str());
+  if (!chapterTitle.empty()) {
+    const int maxW = renderer.getScreenWidth() - 40;
+    const std::string chapter = renderer.truncatedText(UI_10_FONT_ID, chapterTitle.c_str(), maxW,
+                                                       EpdFontFamily::BOLD);
+    const int cw = renderer.getTextWidth(UI_10_FONT_ID, chapter.c_str(), EpdFontFamily::BOLD);
+    renderer.fillRect(0, 0, renderer.getScreenWidth(), 30, false);
+    renderer.drawText(UI_10_FONT_ID, (renderer.getScreenWidth() - cw) / 2, 5, chapter.c_str(), true,
+                      EpdFontFamily::BOLD);
+  }
+
+  const char* header = tr(STR_READER_MENU);
+  const int hw = renderer.getTextWidth(UI_12_FONT_ID, header, EpdFontFamily::BOLD);
+  const int hy = modal.y + (headerHeight - renderer.getLineHeight(UI_12_FONT_ID)) / 2;
+  renderer.drawText(UI_12_FONT_ID, modal.x + (modal.width - hw) / 2, hy, header, true, EpdFontFamily::BOLD);
+  renderer.drawLine(modal.x + 12, modal.y + headerHeight - 1, modal.x + modal.width - 13,
+                    modal.y + headerHeight - 1);
 }
 
 void EpubReaderMenuActivity::render(RenderLock&&) {
   if (optionPopup.processRender(renderer, mappedInput)) return;
 
-  renderer.clearScreen();
   drawChrome();
-
   renderUi();
-
-  drawFooter();
-  renderer.displayBuffer();
+  renderer.displayBuffer(HalDisplay::FAST_REFRESH);
 }

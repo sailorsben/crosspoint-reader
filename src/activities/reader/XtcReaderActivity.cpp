@@ -42,11 +42,21 @@ bool XtcReaderActivity::loadBook() {
   return true;
 }
 
+std::string XtcReaderActivity::currentChapterTitle() const {
+  if (!xtc || !xtc->hasChapters()) return "";
+  const auto& chapters = xtc->getChapters();
+  const auto it = std::find_if(chapters.begin(), chapters.end(), [this](const xtc::ChapterInfo& chapter) {
+    return currentPage >= chapter.startPage && currentPage <= chapter.endPage;
+  });
+  if (it == chapters.end()) return "";
+  return it->name.empty() ? tr(STR_UNNAMED) : it->name;
+}
+
 void XtcReaderActivity::openReaderMenu() {
   if (!xtc) return;
 
   const bool hasChapters = xtc->hasChapters() && !xtc->getChapters().empty();
-  auto menu = makeUniqueNoThrow<XtcReaderMenuActivity>(renderer, mappedInput, xtc->getTitle(), currentPage,
+  auto menu = makeUniqueNoThrow<XtcReaderMenuActivity>(renderer, mappedInput, currentChapterTitle(), currentPage,
                                                        xtc->getPageCount(), hasChapters, selectedPageTurnOption);
   if (!menu) {
     LOG_ERR("XTR", "OOM: XTC reader menu");
