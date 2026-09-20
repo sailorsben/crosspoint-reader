@@ -40,8 +40,8 @@ class EpubReaderMenuActivity final : public UiListActivity {
 
   explicit EpubReaderMenuActivity(GfxRenderer& renderer, MappedInputManager& mappedInput,
                                   const std::string& chapterTitle, const int currentPage, const int totalPages,
-                                  const int bookProgressPercent,
-                                  const uint8_t currentOrientation, const bool hasFootnotes, bool hasBookmarks);
+                                  const int bookProgressPercent, const uint8_t currentOrientation,
+                                  const bool hasFootnotes, bool hasBookmarks);
 
   void render(RenderLock&&) override;
   bool handleHomeGesture() override;

@@ -11,9 +11,9 @@
 namespace fui = freeink::ui;
 
 XtcReaderMenuActivity::XtcReaderMenuActivity(GfxRenderer& renderer, MappedInputManager& mappedInput,
-                                             std::string chapterTitle,
-                                             const uint32_t currentPage, const uint32_t totalPages,
-                                             const bool hasChapters, const uint8_t selectedPageTurnOption)
+                                             std::string chapterTitle, const uint32_t currentPage,
+                                             const uint32_t totalPages, const bool hasChapters,
+                                             const uint8_t selectedPageTurnOption)
     : UiListActivity("XtcReaderMenu", renderer, mappedInput),
       chapterTitle(std::move(chapterTitle)),
       currentPage(currentPage),
@@ -150,8 +150,7 @@ void XtcReaderMenuActivity::drawChrome() {
 
   if (!chapterTitle.empty()) {
     const int maxW = renderer.getScreenWidth() - 40;
-    const std::string chapter =
-        renderer.truncatedText(UI_10_FONT_ID, chapterTitle.c_str(), maxW, EpdFontFamily::BOLD);
+    const std::string chapter = renderer.truncatedText(UI_10_FONT_ID, chapterTitle.c_str(), maxW, EpdFontFamily::BOLD);
     const int cw = renderer.getTextWidth(UI_10_FONT_ID, chapter.c_str(), EpdFontFamily::BOLD);
     renderer.fillRect(0, 0, renderer.getScreenWidth(), 30, false);
     renderer.drawText(UI_10_FONT_ID, (renderer.getScreenWidth() - cw) / 2, 5, chapter.c_str(), true,

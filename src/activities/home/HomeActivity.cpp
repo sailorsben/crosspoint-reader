@@ -105,9 +105,8 @@ void HomeActivity::toggleVesperInterfaceOrientation() {
 void HomeActivity::loadRecentBooks(int maxBooks) {
   recentBooks.clear();
   const auto& books = RECENT_BOOKS.getBooks();
-  const int limit = SETTINGS.uiTheme == CrossPointSettings::UI_THEME::VESPERUI
-                        ? RecentBooksStore::MAX_RECENT_BOOKS
-                        : maxBooks;
+  const int limit =
+      SETTINGS.uiTheme == CrossPointSettings::UI_THEME::VESPERUI ? RecentBooksStore::MAX_RECENT_BOOKS : maxBooks;
   std::vector<RecentBook> loaded;
   loaded.reserve(std::min(static_cast<int>(books.size()), limit));
 
@@ -566,8 +565,7 @@ void HomeActivity::loop() {
       }
       if (touchedIndex >= 0) {
         selectorIndex = touchedIndex;
-        if (usesVesperLibraryPane() && touchedIndex > 0 &&
-            touchedIndex < static_cast<int>(recentBooks.size())) {
+        if (usesVesperLibraryPane() && touchedIndex > 0 && touchedIndex < static_cast<int>(recentBooks.size())) {
           const RecentBook& tapped = recentBooks[static_cast<size_t>(touchedIndex)];
           const unsigned long now = millis();
           if (tapped.path == lastVesperTapPath && now - lastVesperTapAt <= 350) {
@@ -681,7 +679,7 @@ void HomeActivity::render(RenderLock&&) {
                           bufferRestored, std::bind(&HomeActivity::storeCoverBuffer, this));
   if (usesVesperLibraryPane()) {
     VesperTheme::drawHomeRecentPane(renderer, homeBookBand, recentBooks, selectorIndex, vesperRecentTotal,
-                                   vesperRecentOffset, false);
+                                    vesperRecentOffset, false);
     storeCoverBuffer();
   }
 

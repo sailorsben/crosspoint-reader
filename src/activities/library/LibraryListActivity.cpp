@@ -4,7 +4,6 @@
 #include <FreeInkUIIcon.h>
 #include <FsHelpers.h>
 #include <GfxRenderer.h>
-#include <Xtc.h>
 #include <HalStorage.h>
 #include <I18n.h>
 #include <LibraryBuilder.h>
@@ -12,6 +11,7 @@
 #include <Logging.h>
 #include <Memory.h>
 #include <Utf8.h>
+#include <Xtc.h>
 
 #include <algorithm>
 #include <cstdio>
@@ -631,14 +631,13 @@ bool LibraryListActivity::rowTextFor(const int entry, std::string& title, std::s
   return true;
 }
 
-
 bool LibraryListActivity::usesVesperLibrary() const {
   return SETTINGS.uiTheme == CrossPointSettings::UI_THEME::VESPERUI;
 }
 
 int LibraryListActivity::vesperVisibleCount() const {
   if (renderer.getScreenWidth() > renderer.getScreenHeight()) return 3;  // two full + partial third
-  return 4;  // two columns x two rows
+  return 4;                                                              // two columns x two rows
 }
 
 bool LibraryListActivity::pathForEntry(const int entry, std::string& path) {
@@ -816,9 +815,9 @@ void LibraryListActivity::loopVesper() {
     const int my = (sh - modalH) / 2;
     if (tx >= mx && tx < mx + modalW && ty >= my + 10 && ty < my + 10 + rowH * 5) {
       const int row = (ty - (my + 10)) / rowH;
-      static constexpr library::SortOrder choices[5] = {
-          library::SortOrder::TitleAsc, library::SortOrder::TitleDesc, library::SortOrder::AuthorAsc,
-          library::SortOrder::AuthorDesc, library::SortOrder::RecentDesc};
+      static constexpr library::SortOrder choices[5] = {library::SortOrder::TitleAsc, library::SortOrder::TitleDesc,
+                                                        library::SortOrder::AuthorAsc, library::SortOrder::AuthorDesc,
+                                                        library::SortOrder::RecentDesc};
       setVesperSort(choices[std::clamp(row, 0, 4)]);
     } else {
       vesperSortOpen = false;
@@ -973,16 +972,14 @@ void LibraryListActivity::drawVesperCoverEntry(const int entry, const int x, con
     renderer.drawRect(x, y, width, height, 1, true);
     const char* fallback = "BOOK";
     const int fw = renderer.getTextWidth(UI_10_FONT_ID, fallback, EpdFontFamily::BOLD);
-    renderer.drawText(UI_10_FONT_ID, x + (width - fw) / 2,
-                      y + (height - renderer.getLineHeight(UI_10_FONT_ID)) / 2, fallback, true,
-                      EpdFontFamily::BOLD);
+    renderer.drawText(UI_10_FONT_ID, x + (width - fw) / 2, y + (height - renderer.getLineHeight(UI_10_FONT_ID)) / 2,
+                      fallback, true, EpdFontFamily::BOLD);
   } else {
     renderer.drawRect(x, y, width, height, 1, true);
   }
 
   const int textY = y + height + 5;
-  const std::string titleLine =
-      renderer.truncatedText(UI_10_FONT_ID, title.c_str(), width, EpdFontFamily::BOLD);
+  const std::string titleLine = renderer.truncatedText(UI_10_FONT_ID, title.c_str(), width, EpdFontFamily::BOLD);
   renderer.drawText(UI_10_FONT_ID, x, textY, titleLine.c_str(), true, EpdFontFamily::BOLD);
   if (!author.empty()) {
     const std::string authorLine = renderer.truncatedText(SMALL_FONT_ID, author.c_str(), width);
@@ -1047,8 +1044,8 @@ void LibraryListActivity::renderVesperKeyboard() {
       renderer.drawRoundedRect(x + 1, y, keyW - 2, keyH, 1, 3, true);
       char label[2] = {rows[row][col], 0};
       const int tw = renderer.getTextWidth(SMALL_FONT_ID, label, EpdFontFamily::BOLD);
-      renderer.drawText(SMALL_FONT_ID, x + (keyW - tw) / 2,
-                        y + (keyH - renderer.getLineHeight(SMALL_FONT_ID)) / 2, label, true, EpdFontFamily::BOLD);
+      renderer.drawText(SMALL_FONT_ID, x + (keyW - tw) / 2, y + (keyH - renderer.getLineHeight(SMALL_FONT_ID)) / 2,
+                        label, true, EpdFontFamily::BOLD);
     }
   }
 
@@ -1077,15 +1074,15 @@ void LibraryListActivity::renderVesperSortOverlay() {
   renderer.drawRect(mx, my, modalW, modalH, 2, true);
 
   static const char* labels[5] = {"Title A-Z", "Title Z-A", "Author A-Z", "Author Z-A", "Recently Added"};
-  static constexpr library::SortOrder choices[5] = {
-      library::SortOrder::TitleAsc, library::SortOrder::TitleDesc, library::SortOrder::AuthorAsc,
-      library::SortOrder::AuthorDesc, library::SortOrder::RecentDesc};
+  static constexpr library::SortOrder choices[5] = {library::SortOrder::TitleAsc, library::SortOrder::TitleDesc,
+                                                    library::SortOrder::AuthorAsc, library::SortOrder::AuthorDesc,
+                                                    library::SortOrder::RecentDesc};
 
   for (int i = 0; i < 5; ++i) {
     const int y = my + 10 + i * rowH;
     if (sortOrder == choices[i]) renderer.fillRectDither(mx + 5, y + 2, modalW - 10, rowH - 4, Color::LightGray);
-    renderer.drawText(UI_10_FONT_ID, mx + 18, y + (rowH - renderer.getLineHeight(UI_10_FONT_ID)) / 2, labels[i],
-                      true, EpdFontFamily::BOLD);
+    renderer.drawText(UI_10_FONT_ID, mx + 18, y + (rowH - renderer.getLineHeight(UI_10_FONT_ID)) / 2, labels[i], true,
+                      EpdFontFamily::BOLD);
     if (i < 4) renderer.drawLine(mx + 10, y + rowH - 1, mx + modalW - 11, y + rowH - 1);
   }
 }

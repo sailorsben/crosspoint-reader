@@ -1,7 +1,5 @@
 #include "XtcReaderActivity.h"
 
-#include "ImmersiveOptionsActivity.h"
-
 #include <FsHelpers.h>
 #include <GfxRenderer.h>
 #include <HalStorage.h>
@@ -9,6 +7,8 @@
 #include <Memory.h>
 
 #include <algorithm>
+
+#include "ImmersiveOptionsActivity.h"
 
 namespace {
 constexpr int PAGE_TURN_RATES[] = {0, 1, 3, 6, 12};
@@ -289,7 +289,6 @@ void XtcReaderActivity::renderStatusBarOverlay(GfxRenderer& renderer, const Stat
   const float progress = pageCount > 0 ? (static_cast<float>(displayPage) * 100.0f) / pageCount : 0.0f;
   const auto pageInfo = getStatusBarInfo();
   GUI.drawStatusBar(renderer, progress, pageInfo.currentPage, pageInfo.pageCount, pageInfo.title, paddingBottom);
-
 }
 
 void XtcReaderActivity::renderPage() {

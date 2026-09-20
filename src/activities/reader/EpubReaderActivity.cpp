@@ -1,7 +1,5 @@
 #include "EpubReaderActivity.h"
 
-#include "ImmersiveOptionsActivity.h"
-
 #include <Epub/Page.h>
 #include <Epub/blocks/TextBlock.h>
 #include <FontCacheManager.h>
@@ -31,6 +29,7 @@
 #include "EpubReaderFootnotesActivity.h"
 #include "EpubReaderPercentSelectionActivity.h"
 #include "EpubReaderUtils.h"
+#include "ImmersiveOptionsActivity.h"
 #include "KOReaderCredentialStore.h"
 #include "KOReaderSyncActivity.h"
 #include "MappedInputManager.h"
@@ -1187,9 +1186,9 @@ void EpubReaderActivity::renderBook() {
 
   const bool vesperFooter =
       SETTINGS.uiTheme == CrossPointSettings::UI_THEME::VESPERUI && VesperReaderFooter::hasContent();
-  const uint8_t statusBarHeight =
-      vesperFooter && SETTINGS.immersiveMode == 0 ? static_cast<uint8_t>(VesperReaderFooter::height())
-                                                 : UITheme::getInstance().getStatusBarHeight();
+  const uint8_t statusBarHeight = vesperFooter && SETTINGS.immersiveMode == 0
+                                      ? static_cast<uint8_t>(VesperReaderFooter::height())
+                                      : UITheme::getInstance().getStatusBarHeight();
 
   if (!vesperFooter && automaticPageTurnActive &&
       (statusBarHeight == 0 || statusBarHeight == UITheme::getInstance().getProgressBarHeight())) {
@@ -1807,8 +1806,7 @@ void EpubReaderActivity::renderStatusBar() const {
 
     int totalBookPages = std::max(1, static_cast<int>(pageCount));
     const size_t bookBytes = epub->getBookSize();
-    const size_t previousBytes =
-        currentSpineIndex > 0 ? epub->getCumulativeSpineItemSize(currentSpineIndex - 1) : 0;
+    const size_t previousBytes = currentSpineIndex > 0 ? epub->getCumulativeSpineItemSize(currentSpineIndex - 1) : 0;
     const size_t currentBytes = epub->getCumulativeSpineItemSize(currentSpineIndex);
     const size_t spineBytes = currentBytes > previousBytes ? currentBytes - previousBytes : 0;
     if (bookBytes > 0 && spineBytes > 0 && pageCount > 0) {

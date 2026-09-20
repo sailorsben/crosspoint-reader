@@ -152,9 +152,8 @@ void ActivityManager::loop() {
         return;
       }
 
-      const bool currentlyLandscape =
-          renderer.getOrientation() == GfxRenderer::Orientation::LandscapeClockwise ||
-          renderer.getOrientation() == GfxRenderer::Orientation::LandscapeCounterClockwise;
+      const bool currentlyLandscape = renderer.getOrientation() == GfxRenderer::Orientation::LandscapeClockwise ||
+                                      renderer.getOrientation() == GfxRenderer::Orientation::LandscapeCounterClockwise;
       if (currentlyLandscape) {
         rememberRendererLandscape();
         SETTINGS.orientation = CrossPointSettings::PORTRAIT;

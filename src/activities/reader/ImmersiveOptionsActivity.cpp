@@ -129,7 +129,8 @@ void ImmersiveOptionsActivity::loop() {
   }
 
   int row = -1;
-  const auto touch = mappedInput.rowTouch(row, rowsTop, rowH, ROW_COUNT, modal.x + 10, modal.x + modal.width - 10, rowH);
+  const auto touch =
+      mappedInput.rowTouch(row, rowsTop, rowH, ROW_COUNT, modal.x + 10, modal.x + modal.width - 10, rowH);
   if (touch == MappedInputManager::RowTouch::Down) {
     if (row >= 0 && row != selectedRow) {
       selectedRow = row;
@@ -153,8 +154,7 @@ void ImmersiveOptionsActivity::render(RenderLock&&) {
   const char* title = tr(STR_IMMERSIVE_OPTIONS);
   const int titleW = renderer.getTextWidth(UI_12_FONT_ID, title, EpdFontFamily::BOLD);
   renderer.drawText(UI_12_FONT_ID, modal.x + (modal.width - titleW) / 2,
-                    modal.y + (headerH - renderer.getLineHeight(UI_12_FONT_ID)) / 2, title, true,
-                    EpdFontFamily::BOLD);
+                    modal.y + (headerH - renderer.getLineHeight(UI_12_FONT_ID)) / 2, title, true, EpdFontFamily::BOLD);
   renderer.drawLine(modal.x + 12, modal.y + headerH - 1, modal.x + modal.width - 13, modal.y + headerH - 1);
 
   constexpr int switchW = 52;

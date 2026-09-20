@@ -14,8 +14,8 @@ namespace fui = freeink::ui;
 EpubReaderMenuActivity::EpubReaderMenuActivity(GfxRenderer& renderer, MappedInputManager& mappedInput,
                                                const std::string& chapterTitle, const int currentPage,
                                                const int totalPages, const int bookProgressPercent,
-                                               const uint8_t currentOrientation,
-                                               const bool hasFootnotes, const bool hasBookmarks)
+                                               const uint8_t currentOrientation, const bool hasFootnotes,
+                                               const bool hasBookmarks)
     : UiListActivity("EpubReaderMenu", renderer, mappedInput),
       chapterTitle(chapterTitle),
       pendingOrientation(currentOrientation),
@@ -166,11 +166,9 @@ void EpubReaderMenuActivity::buildScreen(UiScreen& screen) {
   constexpr int headerHeight = 50;
   constexpr int inset = 14;
 
-  screen.setContentMarginFromScreen(
-      fui::Insets{static_cast<int16_t>(modal.y + headerHeight),
-                  static_cast<int16_t>(sw - (modal.x + modal.width) + inset),
-                  static_cast<int16_t>(sh - (modal.y + modal.height) + inset),
-                  static_cast<int16_t>(modal.x + inset)});
+  screen.setContentMarginFromScreen(fui::Insets{
+      static_cast<int16_t>(modal.y + headerHeight), static_cast<int16_t>(sw - (modal.x + modal.width) + inset),
+      static_cast<int16_t>(sh - (modal.y + modal.height) + inset), static_cast<int16_t>(modal.x + inset)});
 
   for (size_t i = 0; i < menuItems.size(); i++) {
     const auto action = menuItems[i].action;
@@ -205,8 +203,7 @@ void EpubReaderMenuActivity::drawChrome() {
 
   if (!chapterTitle.empty()) {
     const int maxW = renderer.getScreenWidth() - 40;
-    const std::string chapter = renderer.truncatedText(UI_10_FONT_ID, chapterTitle.c_str(), maxW,
-                                                       EpdFontFamily::BOLD);
+    const std::string chapter = renderer.truncatedText(UI_10_FONT_ID, chapterTitle.c_str(), maxW, EpdFontFamily::BOLD);
     const int cw = renderer.getTextWidth(UI_10_FONT_ID, chapter.c_str(), EpdFontFamily::BOLD);
     renderer.fillRect(0, 0, renderer.getScreenWidth(), 30, false);
     renderer.drawText(UI_10_FONT_ID, (renderer.getScreenWidth() - cw) / 2, 5, chapter.c_str(), true,
@@ -217,8 +214,7 @@ void EpubReaderMenuActivity::drawChrome() {
   const int hw = renderer.getTextWidth(UI_12_FONT_ID, header, EpdFontFamily::BOLD);
   const int hy = modal.y + (headerHeight - renderer.getLineHeight(UI_12_FONT_ID)) / 2;
   renderer.drawText(UI_12_FONT_ID, modal.x + (modal.width - hw) / 2, hy, header, true, EpdFontFamily::BOLD);
-  renderer.drawLine(modal.x + 12, modal.y + headerHeight - 1, modal.x + modal.width - 13,
-                    modal.y + headerHeight - 1);
+  renderer.drawLine(modal.x + 12, modal.y + headerHeight - 1, modal.x + modal.width - 13, modal.y + headerHeight - 1);
 }
 
 void EpubReaderMenuActivity::render(RenderLock&&) {

@@ -324,9 +324,9 @@ void VesperTheme::drawRecentBookCover(GfxRenderer& renderer, const Rect rect,
   }
 }
 
-Rect VesperTheme::drawHomeRecentPane(GfxRenderer& renderer, const Rect band,
-                                     const std::vector<RecentBook>& recentBooks, const int selectorIndex,
-                                     const int totalBooks, const int offset, const bool clearPane) {
+Rect VesperTheme::drawHomeRecentPane(GfxRenderer& renderer, const Rect band, const std::vector<RecentBook>& recentBooks,
+                                     const int selectorIndex, const int totalBooks, const int offset,
+                                     const bool clearPane) {
   const auto layout = VesperHome::bookLayout(band, static_cast<int>(recentBooks.size()));
   if (!layout.landscape || layout.recentPane.width <= 0 || layout.recentPane.height <= 0) return {};
 
