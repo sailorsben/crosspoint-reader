@@ -6,6 +6,8 @@
 
 namespace VesperHome {
 
+inline constexpr int LANDSCAPE_LIBRARY_ROWS = 6;
+
 struct Layout {
   bool landscape = false;
   Rect currentHeading;
@@ -13,7 +15,7 @@ struct Layout {
   Rect heroCover;
   Rect heroText;
   Rect recentHeading;
-  Rect recent[3];
+  Rect recent[LANDSCAPE_LIBRARY_ROWS];
   int recentCount = 0;
   int dividerX = -1;
 };
@@ -25,7 +27,7 @@ inline bool contains(const Rect& r, const int x, const int y) {
 inline Layout bookLayout(const Rect band, const int bookCount) {
   Layout l;
   l.landscape = band.width > band.height;
-  l.recentCount = std::clamp(bookCount - 1, 0, 3);
+  l.recentCount = std::clamp(bookCount - 1, 0, l.landscape ? LANDSCAPE_LIBRARY_ROWS : 3);
 
   if (!l.landscape) {
     constexpr int pad = 14;
@@ -62,12 +64,13 @@ inline Layout bookLayout(const Rect band, const int bookCount) {
   const int rightX = l.dividerX + gap;
   const int rightWidth = band.x + band.width - rightX - pad;
   l.recentHeading = Rect{rightX, band.y, rightWidth, 24};
-  const int cardsY = l.recentHeading.y + l.recentHeading.height + 4;
-  const int usableHeight = std::max(0, band.y + band.height - cardsY);
-  const int rowGap = 5;
-  const int rowHeight = std::max(1, (usableHeight - rowGap * 2) / 3);
-  for (int i = 0; i < 3; i++) {
-    l.recent[i] = Rect{rightX, cardsY + i * (rowHeight + rowGap), rightWidth, rowHeight};
+  const int rowsY = l.recentHeading.y + l.recentHeading.height + 2;
+  const int usableHeight = std::max(0, band.y + band.height - rowsY);
+  constexpr int rowGap = 1;
+  const int rowHeight =
+      std::max(1, (usableHeight - rowGap * (LANDSCAPE_LIBRARY_ROWS - 1)) / LANDSCAPE_LIBRARY_ROWS);
+  for (int i = 0; i < LANDSCAPE_LIBRARY_ROWS; i++) {
+    l.recent[i] = Rect{rightX, rowsY + i * (rowHeight + rowGap), rightWidth, rowHeight};
   }
   return l;
 }
@@ -78,11 +81,7 @@ inline Rect coverRect(const Layout& l, const int bookIndex) {
   if (recentIndex < 0 || recentIndex >= l.recentCount) return {};
 
   const Rect card = l.recent[recentIndex];
-  if (l.landscape) {
-    // Side covers are too small to survive e-ink well. Landscape recents are
-    // deliberately text-only; selecting one promotes it into the hero pane.
-    return {};
-  }
+  if (l.landscape) return {};
 
   constexpr int titleReserve = 42;
   return Rect{card.x + 4, card.y + 2, std::max(1, card.width - 8), std::max(1, card.height - titleReserve - 4)};

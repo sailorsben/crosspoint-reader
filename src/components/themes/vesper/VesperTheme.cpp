@@ -22,6 +22,7 @@
 #include "components/icons/recent.h"
 #include "components/icons/settings2.h"
 #include "components/icons/transfer.h"
+#include "components/icons/vesperFolder.h"
 #include "components/icons/vesperLogo.h"
 #include "components/icons/wifi.h"
 #include "fontIds.h"
@@ -63,10 +64,31 @@ void drawVesperLogo(const GfxRenderer& renderer, const int x, const int y, const
     const int srcRow = row * kLogoSourceSize / size;
     for (int col = 0; col < size; col++) {
       const int srcCol = col * kLogoSourceSize / size;
-      const uint8_t byte = VesperAssets::Logo56[srcRow * rowBytes + (srcCol >> 3)];
+      const uint8_t byte = VesperAssets::Logo65[srcRow * rowBytes + (srcCol >> 3)];
       if (((byte >> (7 - (srcCol & 7))) & 1) == 0) renderer.drawPixel(x + col, y + row, true);
     }
   }
+}
+
+void drawRawMonoIcon(const GfxRenderer& renderer, const uint8_t* bitmap, const int sourceSize, const int x, const int y,
+                     const int size) {
+  const int rowBytes = (sourceSize + 7) / 8;
+  for (int row = 0; row < size; row++) {
+    const int srcRow = row * sourceSize / size;
+    for (int col = 0; col < size; col++) {
+      const int srcCol = col * sourceSize / size;
+      const uint8_t byte = bitmap[srcRow * rowBytes + (srcCol >> 3)];
+      if (((byte >> (7 - (srcCol & 7))) & 1) == 0) renderer.drawPixel(x + col, y + row, true);
+    }
+  }
+}
+
+void drawLibraryBookGlyph(const GfxRenderer& renderer, const int x, const int y) {
+  constexpr int width = 15;
+  constexpr int height = 19;
+  renderer.drawRect(x, y, width, height, 1, true);
+  renderer.drawLine(x + 3, y + 1, x + 3, y + height - 2, 1, true);
+  renderer.drawLine(x + 5, y + 4, x + width - 3, y + 4, 1, true);
 }
 
 void drawSectionLabel(const GfxRenderer& renderer, const Rect& rect, const char* label) {
@@ -116,19 +138,9 @@ void drawProgress(const GfxRenderer& renderer, const RecentBook& book, const Rec
 bool drawVesperNavIcon(const GfxRenderer& renderer, const UIIcon icon, const int x, const int y, const int size) {
   const int cx = x + size / 2;
   switch (icon) {
-    case UIIcon::Folder: {
-      const int top = y + 3;
-      const int bottom = y + size - 2;
-      renderer.drawLine(x + 2, top + 5, x + 9, top + 5, 2, true);
-      renderer.drawLine(x + 9, top + 5, x + 13, top + 1, 2, true);
-      renderer.drawLine(x + 13, top + 1, x + 20, top + 1, 2, true);
-      renderer.drawLine(x + 20, top + 1, x + 23, top + 5, 2, true);
-      renderer.drawLine(x + 23, top + 5, x + size - 2, top + 5, 2, true);
-      renderer.drawLine(x + 2, top + 5, x + 2, bottom, 2, true);
-      renderer.drawLine(x + size - 2, top + 5, x + size - 2, bottom, 2, true);
-      renderer.drawLine(x + 2, bottom, x + size - 2, bottom, 2, true);
+    case UIIcon::Folder:
+      drawRawMonoIcon(renderer, VesperAssets::Folder28, VesperAssets::FOLDER_SIZE, x, y, size);
       return true;
-    }
     case UIIcon::Library:
       renderer.drawRect(x + 3, y + 5, 6, size - 9, 2, true);
       renderer.drawRect(x + 11, y + 3, 6, size - 7, 2, true);
@@ -172,18 +184,28 @@ void drawPortraitRecents(const GfxRenderer& renderer, const VesperHome::Layout& 
 
 void drawLandscapeRecents(const GfxRenderer& renderer, const VesperHome::Layout& layout,
                           const std::vector<RecentBook>& recentBooks) {
+  constexpr int iconWidth = 23;
   for (int i = 0; i < layout.recentCount; i++) {
     const Rect card = layout.recent[i];
     const RecentBook& book = recentBooks[static_cast<size_t>(i + 1)];
+    const int iconY = card.y + std::max(2, (card.height - 19) / 2);
+    drawLibraryBookGlyph(renderer, card.x + 4, iconY);
 
-    const Rect title{card.x + 8, card.y + 8, card.width - 16, std::max(1, card.height - 28)};
-    drawTitleLines(renderer, book, title, UI_10_FONT_ID, 2, false);
+    const int textX = card.x + iconWidth;
+    const int textWidth = std::max(1, card.width - iconWidth - 5);
+    const std::string title =
+        renderer.truncatedText(UI_10_FONT_ID, book.title.c_str(), textWidth, EpdFontFamily::BOLD);
+    renderer.drawText(UI_10_FONT_ID, textX, card.y + 3, title.c_str(), true, EpdFontFamily::BOLD);
 
     if (!book.author.empty()) {
       const std::string author =
-          renderer.truncatedText(SMALL_FONT_ID, book.author.c_str(), card.width - 16, EpdFontFamily::REGULAR);
-      renderer.drawText(SMALL_FONT_ID, card.x + 8, card.y + card.height - renderer.getLineHeight(SMALL_FONT_ID) - 5,
-                        author.c_str());
+          renderer.truncatedText(SMALL_FONT_ID, book.author.c_str(), textWidth, EpdFontFamily::REGULAR);
+      const int authorY = card.y + card.height - renderer.getLineHeight(SMALL_FONT_ID) - 3;
+      renderer.drawText(SMALL_FONT_ID, textX, authorY, author.c_str());
+    }
+
+    if (i + 1 < layout.recentCount) {
+      renderer.drawLine(card.x + 2, card.y + card.height, card.x + card.width - 2, card.y + card.height);
     }
   }
 }
@@ -221,10 +243,17 @@ void VesperTheme::drawHeader(const GfxRenderer& renderer, const Rect rect, const
                              const char* subtitle) const {
   BaseTheme::drawHeader(renderer, rect, title, subtitle);
 
-  const int logoSize = VesperAssets::LOGO_SIZE;
-  const int logoX = rect.x + (rect.width - logoSize) / 2;
+  // VesperUI wordmark: the approved feathered mark is literally the "V".
+  constexpr int logoSize = 42;
+  constexpr int leftInset = 9;
+  constexpr int wordGap = 3;
+  const int logoX = rect.x + leftInset;
   const int logoY = rect.y + std::max(0, (rect.height - logoSize) / 2);
   drawVesperLogo(renderer, logoX, logoY, logoSize);
+
+  constexpr const char* word = "esperUI";
+  const int wordY = rect.y + (rect.height - renderer.getLineHeight(UI_10_FONT_ID)) / 2;
+  renderer.drawText(UI_10_FONT_ID, logoX + logoSize + wordGap, wordY, word, true, EpdFontFamily::BOLD);
 }
 
 void VesperTheme::drawRecentBookCover(GfxRenderer& renderer, const Rect rect,
@@ -275,7 +304,7 @@ void VesperTheme::drawRecentBookCover(GfxRenderer& renderer, const Rect rect,
     }
 
     if (layout.recentCount > 0) {
-      drawSectionLabel(renderer, layout.recentHeading, tr(STR_MENU_RECENT_BOOKS));
+      drawSectionLabel(renderer, layout.recentHeading, tr(layout.landscape ? STR_LIBRARY : STR_MENU_RECENT_BOOKS));
       if (layout.dividerX >= 0) renderer.drawLine(layout.dividerX, rect.y, layout.dividerX, rect.y + rect.height - 1);
       if (layout.landscape)
         drawLandscapeRecents(renderer, layout, recentBooks);

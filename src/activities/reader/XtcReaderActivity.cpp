@@ -190,6 +190,23 @@ GfxRenderer::Orientation XtcReaderActivity::tapInputOrientation() const {
   }
 }
 
+GfxRenderer::Orientation XtcReaderActivity::statusBarOrientation() const {
+  // XTC page pixels stay in the file's portrait framebuffer. A user holding
+  // that framebuffer sideways sees chrome in the opposite logical rotation
+  // from the touch transform, so mirror the two landscape profiles here.
+  switch (SETTINGS.xtcTapProfile) {
+    case CrossPointSettings::XTC_TAP_LANDSCAPE_CW:
+      return GfxRenderer::Orientation::LandscapeCounterClockwise;
+    case CrossPointSettings::XTC_TAP_LANDSCAPE_CCW:
+      return GfxRenderer::Orientation::LandscapeClockwise;
+    case CrossPointSettings::XTC_TAP_INVERTED:
+      return GfxRenderer::Orientation::PortraitInverted;
+    case CrossPointSettings::XTC_TAP_PORTRAIT:
+    default:
+      return GfxRenderer::Orientation::Portrait;
+  }
+}
+
 void XtcReaderActivity::renderBook() {
   if (!xtc) {
     return;
@@ -237,7 +254,7 @@ void XtcReaderActivity::renderStatusBarOverlay(GfxRenderer& renderer, const Stat
   }
 
   const GfxRenderer::Orientation pageOrientation = renderer.getOrientation();
-  const GfxRenderer::Orientation overlayOrientation = tapInputOrientation();
+  const GfxRenderer::Orientation overlayOrientation = statusBarOrientation();
   if (pageOrientation != overlayOrientation) renderer.setOrientation(overlayOrientation);
 
   const int statusBarHeight = UITheme::getInstance().getStatusBarHeight();
@@ -278,6 +295,10 @@ void XtcReaderActivity::renderStatusBarOverlay(GfxRenderer& renderer, const Stat
 }
 
 void XtcReaderActivity::renderPage() {
+  // Never inherit a transient menu/interface transform. XTC page data is
+  // authored against the portrait framebuffer; only its status chrome rotates.
+  renderer.setOrientation(GfxRenderer::Orientation::Portrait);
+
   const uint16_t pageWidth = xtc->getPageWidth();
   const uint16_t pageHeight = xtc->getPageHeight();
   const uint8_t bitDepth = xtc->getBitDepth();

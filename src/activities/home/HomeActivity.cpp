@@ -7,6 +7,8 @@
 #include <HalDisplay.h>
 #include <HalStorage.h>
 #include <I18n.h>
+#include <LibraryBuilder.h>
+#include <LibraryIndexFile.h>
 #include <Utf8.h>
 #include <Xtc.h>
 
@@ -35,6 +37,99 @@ int HomeActivity::getMenuItemCount() const {
   return count;
 }
 
+bool HomeActivity::usesVesperLibraryPane() const {
+  return SETTINGS.uiTheme == CrossPointSettings::UI_THEME::VESPERUI &&
+         SETTINGS.interfaceOrientation != CrossPointSettings::UI_PORTRAIT;
+}
+
+bool HomeActivity::loadVesperLibraryWindow() {
+  if (!usesVesperLibraryPane() || recentBooks.empty()) return false;
+
+  RecentBook hero = recentBooks.front();
+  library::LibraryIndexFile index;
+  if (!index.open(library::libraryIndexPath())) {
+    library::BuildStats stats;
+    if (!library::buildLibraryIndex("/", stats, SETTINGS.libraryUseMetadata != 0) ||
+        !index.open(library::libraryIndexPath())) {
+      vesperLibraryTotal = 0;
+      return false;
+    }
+  }
+
+  vesperLibraryTotal = static_cast<int>(index.bookCount());
+  const int maxOffset = std::max(0, vesperLibraryTotal - VESPER_LIBRARY_VISIBLE_ROWS);
+  vesperLibraryOffset = std::clamp(vesperLibraryOffset, 0, maxOffset);
+
+  std::vector<RecentBook> window;
+  window.reserve(1 + VESPER_LIBRARY_VISIBLE_ROWS);
+  window.push_back(std::move(hero));
+
+  for (int row = vesperLibraryOffset;
+       row < vesperLibraryTotal && static_cast<int>(window.size()) <= VESPER_LIBRARY_VISIBLE_ROWS; ++row) {
+    const uint16_t ordinal = index.ordinalForRow(library::SortOrder::TitleAsc, static_cast<uint16_t>(row));
+    if (ordinal == 0xFFFF) continue;
+
+    library::ClixRecord record{};
+    std::string path;
+    if (!index.readRecord(ordinal, record) || !index.readPath(record, path)) continue;
+    if (path == window.front().path) continue;
+
+    std::string title;
+    if (!index.readTitle(record, title) || title.empty()) {
+      if (!index.readName(record, title)) continue;
+      const size_t dot = title.find_last_of('.');
+      if (dot != std::string::npos && dot > 0) title.erase(dot);
+    }
+
+    std::string author;
+    index.readAuthor(record, author);
+    window.push_back(RecentBook{std::move(path), std::move(title), std::move(author), ""});
+  }
+
+  index.close();
+  recentBooks = std::move(window);
+  return recentBooks.size() > 1;
+}
+
+void HomeActivity::scrollVesperLibrary(const int delta) {
+  if (!usesVesperLibraryPane() || vesperLibraryTotal <= VESPER_LIBRARY_VISIBLE_ROWS || delta == 0) return;
+  const int maxOffset = std::max(0, vesperLibraryTotal - VESPER_LIBRARY_VISIBLE_ROWS);
+  const int next = std::clamp(vesperLibraryOffset + delta, 0, maxOffset);
+  if (next == vesperLibraryOffset) return;
+
+  vesperLibraryOffset = next;
+  if (!loadVesperLibraryWindow()) return;
+
+  selectorIndex = recentBooks.size() > 1 ? 1 : 0;
+  freeCoverBuffer();
+  coverRendered = false;
+  vesperGrayCoversOnPanel = false;
+  recentsLoaded = true;
+  recentsLoading = false;
+  requestUpdate(true);
+}
+
+void HomeActivity::toggleVesperInterfaceOrientation() {
+  SETTINGS.interfaceOrientation = SETTINGS.interfaceOrientation == CrossPointSettings::UI_PORTRAIT
+                                      ? CrossPointSettings::UI_LANDSCAPE_CW
+                                      : CrossPointSettings::UI_PORTRAIT;
+  SETTINGS.saveToFile();
+  applyDisplayOrientation();
+
+  vesperLibraryOffset = 0;
+  vesperLibraryTotal = 0;
+  freeCoverBuffer();
+  coverRendered = false;
+  vesperGrayCoversOnPanel = false;
+  recentsLoaded = false;
+  recentsLoading = false;
+
+  const auto& metrics = UITheme::getInstance().getMetrics();
+  loadRecentBooks(metrics.homeRecentBooksCount);
+  selectorIndex = 0;
+  requestUpdate(true);
+}
+
 void HomeActivity::loadRecentBooks(int maxBooks) {
   recentBooks.clear();
   const auto& books = RECENT_BOOKS.getBooks();
@@ -56,6 +151,7 @@ void HomeActivity::loadRecentBooks(int maxBooks) {
 
   if (SETTINGS.uiTheme == CrossPointSettings::UI_THEME::VESPERUI && !recentBooks.empty()) {
     loadVesperProgress(recentBooks.front());
+    if (usesVesperLibraryPane()) loadVesperLibraryWindow();
   }
 }
 
@@ -209,12 +305,23 @@ void HomeActivity::loadRecentCovers(int coverHeight) {
 void HomeActivity::promoteRecentToHero(const int index) {
   if (index <= 0 || index >= static_cast<int>(recentBooks.size())) return;
 
-  std::swap(recentBooks[0], recentBooks[static_cast<size_t>(index)]);
-  loadVesperProgress(recentBooks[0]);
+  if (usesVesperLibraryPane()) {
+    const RecentBook selected = recentBooks[static_cast<size_t>(index)];
+    RecentBook hero = RECENT_BOOKS.getDataFromBook(selected.path);
+    if (hero.title.empty()) hero.title = selected.title;
+    if (hero.author.empty()) hero.author = selected.author;
+    if (hero.path.empty()) hero.path = selected.path;
+    recentBooks[0] = std::move(hero);
+    loadVesperProgress(recentBooks[0]);
+    loadVesperLibraryWindow();
+  } else {
+    std::swap(recentBooks[0], recentBooks[static_cast<size_t>(index)]);
+    loadVesperProgress(recentBooks[0]);
+  }
   selectorIndex = 0;
 
-  // Hero and side rows use different geometry. Regenerate only the Vesper
-  // thumbnails needed by the new layout instead of stretching a tiny recent.
+  // The promoted hero needs the large Vesper grayscale thumbnail; side-list
+  // rows deliberately have no covers.
   freeCoverBuffer();
   coverRendered = false;
   vesperGrayCoversOnPanel = false;
@@ -227,6 +334,8 @@ void HomeActivity::onEnter() {
   Activity::onEnter();
 
   vesperGrayCoversOnPanel = false;
+  vesperLibraryOffset = 0;
+  vesperLibraryTotal = 0;
   hasOpdsServers = OPDS_STORE.hasServers();
 
   const auto& metrics = UITheme::getInstance().getMetrics();
@@ -379,6 +488,16 @@ void HomeActivity::loop() {
   const int menuCount = getMenuItemCount();
   const auto& metrics = UITheme::getInstance().getMetrics();
 
+  if (SETTINGS.uiTheme == CrossPointSettings::UI_THEME::VESPERUI &&
+      SETTINGS.longPressButtonBehavior == CrossPointSettings::ORIENTATION_CHANGE) {
+    int longX = 0;
+    int longY = 0;
+    if (mappedInput.wasScreenLongPress(longX, longY)) {
+      toggleVesperInterfaceOrientation();
+      return;
+    }
+  }
+
   auto activateSelection = [this] {
     if (selectorIndex < static_cast<int>(recentBooks.size())) {
       if (SETTINGS.uiTheme == CrossPointSettings::UI_THEME::VESPERUI && selectorIndex > 0) {
@@ -421,6 +540,12 @@ void HomeActivity::loop() {
   });
 
   const auto swipe = mappedInput.wasSwipe();
+  if (usesVesperLibraryPane() &&
+      (swipe == MappedInputManager::SwipeDir::Up || swipe == MappedInputManager::SwipeDir::Down)) {
+    constexpr int scrollStep = VESPER_LIBRARY_VISIBLE_ROWS - 2;
+    scrollVesperLibrary(swipe == MappedInputManager::SwipeDir::Up ? scrollStep : -scrollStep);
+    return;
+  }
   if (swipe == MappedInputManager::SwipeDir::Up) {
     selectorIndex = ButtonNavigator::nextIndex(selectorIndex, menuCount);
     requestUpdate();

@@ -99,9 +99,12 @@ void ActivityManager::loop() {
                                           : CrossPointSettings::UI_PORTRAIT;
       SETTINGS.saveToFile();
 
-      // Reader pages own their own orientation. The setting still changes now
-      // so the next menu/sleep screen uses it, but don't repaint the book.
-      if (!currentActivity->isReaderActivity()) {
+      // Reader pages own their own orientation. Home also owns an orientation-
+      // specific book model (hero + landscape library window), so rebuild it
+      // rather than merely rotating the old layout in place.
+      if (currentActivity->isHomeActivity()) {
+        goHome();
+      } else if (!currentActivity->isReaderActivity()) {
         currentActivity->applyDisplayOrientation();
         requestUpdate();
       }

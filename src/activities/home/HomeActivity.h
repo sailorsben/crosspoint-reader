@@ -29,6 +29,9 @@ class HomeActivity final : public Activity {
   int coverRectW = 0;
   int coverRectH = 0;
   std::vector<RecentBook> recentBooks;
+  static constexpr int VESPER_LIBRARY_VISIBLE_ROWS = 6;
+  int vesperLibraryOffset = 0;
+  int vesperLibraryTotal = 0;
   const HomeMenuItem initialMenuItem;
   const bool cleanInitialRefresh;
 
@@ -70,6 +73,10 @@ class HomeActivity final : public Activity {
   void freeCoverBuffer();     // Free the stored cover buffer
   void loadRecentBooks(int maxBooks);
   void loadRecentCovers(int coverHeight);
+  bool usesVesperLibraryPane() const;
+  bool loadVesperLibraryWindow();
+  void scrollVesperLibrary(int delta);
+  void toggleVesperInterfaceOrientation();
   void promoteRecentToHero(int index);
   void loadVesperProgress(RecentBook& book);
   bool drawVesperCoverArt();
