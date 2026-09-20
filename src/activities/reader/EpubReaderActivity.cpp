@@ -1816,8 +1816,7 @@ void EpubReaderActivity::renderStatusBar() const {
     if (vesperEstimatedBookPages <= 0) {
       int estimate = std::max(1, static_cast<int>(pageCount));
       const size_t bookBytes = epub->getBookSize();
-      const size_t previousBytes =
-          currentSpineIndex > 0 ? epub->getCumulativeSpineItemSize(currentSpineIndex - 1) : 0;
+      const size_t previousBytes = currentSpineIndex > 0 ? epub->getCumulativeSpineItemSize(currentSpineIndex - 1) : 0;
       const size_t currentBytes = epub->getCumulativeSpineItemSize(currentSpineIndex);
       const size_t spineBytes = currentBytes > previousBytes ? currentBytes - previousBytes : 0;
       if (bookBytes > 0 && spineBytes > 0 && pageCount > 0) {

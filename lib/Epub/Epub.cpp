@@ -973,7 +973,6 @@ bool Epub::generateVesperLibraryThumbBmp(const int width, const int height) cons
   return success;
 }
 
-
 uint8_t* Epub::readItemContentsToBytes(const std::string& itemHref, size_t* size, const bool trailingNullByte) const {
   if (itemHref.empty()) {
     LOG_DBG("EBP", "Failed to read item, empty href");

@@ -634,8 +634,7 @@ bool Xtc::generateVesperLibraryThumbBmp(const int targetWidth, const int targetH
   const uint32_t rowSize = (static_cast<uint32_t>(targetWidth) + 31) / 32 * 4;
   auto scratch = makeUniqueNoThrow<uint8_t[]>(bitmapSize + rowSize);
   if (!scratch) {
-    LOG_ERR("XTC", "OOM: Vesper Library thumb buffers (%lu bytes)",
-            static_cast<unsigned long>(bitmapSize + rowSize));
+    LOG_ERR("XTC", "OOM: Vesper Library thumb buffers (%lu bytes)", static_cast<unsigned long>(bitmapSize + rowSize));
     return false;
   }
   uint8_t* pageBuffer = scratch.get();
@@ -729,7 +728,6 @@ bool Xtc::generateVesperLibraryThumbBmp(const int targetWidth, const int targetH
   LOG_DBG("XTC", "Generated VesperUI Library thumb %dx%d: %s", targetWidth, targetHeight, outputPath.c_str());
   return true;
 }
-
 
 uint32_t Xtc::getPageCount() const {
   if (!loaded || !parser) {

@@ -150,20 +150,20 @@ void ActivityManager::loop() {
       }
 
       const bool readerActive = currentActivity->isReaderActivity();
-      const bool currentlyLandscape =
-          readerActive ? (SETTINGS.orientation == CrossPointSettings::LANDSCAPE_CW ||
-                          SETTINGS.orientation == CrossPointSettings::LANDSCAPE_CCW)
-                       : (SETTINGS.interfaceOrientation == CrossPointSettings::UI_LANDSCAPE_CW ||
-                          SETTINGS.interfaceOrientation == CrossPointSettings::UI_LANDSCAPE_CCW);
+      const bool currentlyLandscape = readerActive
+                                          ? (SETTINGS.orientation == CrossPointSettings::LANDSCAPE_CW ||
+                                             SETTINGS.orientation == CrossPointSettings::LANDSCAPE_CCW)
+                                          : (SETTINGS.interfaceOrientation == CrossPointSettings::UI_LANDSCAPE_CW ||
+                                             SETTINGS.interfaceOrientation == CrossPointSettings::UI_LANDSCAPE_CCW);
       if (currentlyLandscape) {
         if (readerActive) {
-          SETTINGS.lastLandscapeOrientation =
-              SETTINGS.orientation == CrossPointSettings::LANDSCAPE_CCW ? CrossPointSettings::LANDSCAPE_CCW
-                                                                         : CrossPointSettings::LANDSCAPE_CW;
+          SETTINGS.lastLandscapeOrientation = SETTINGS.orientation == CrossPointSettings::LANDSCAPE_CCW
+                                                  ? CrossPointSettings::LANDSCAPE_CCW
+                                                  : CrossPointSettings::LANDSCAPE_CW;
         } else {
-          SETTINGS.lastLandscapeOrientation =
-              SETTINGS.interfaceOrientation == CrossPointSettings::UI_LANDSCAPE_CCW ? CrossPointSettings::LANDSCAPE_CCW
-                                                                                      : CrossPointSettings::LANDSCAPE_CW;
+          SETTINGS.lastLandscapeOrientation = SETTINGS.interfaceOrientation == CrossPointSettings::UI_LANDSCAPE_CCW
+                                                  ? CrossPointSettings::LANDSCAPE_CCW
+                                                  : CrossPointSettings::LANDSCAPE_CW;
         }
         SETTINGS.orientation = CrossPointSettings::PORTRAIT;
         SETTINGS.interfaceOrientation = CrossPointSettings::UI_PORTRAIT;
