@@ -67,8 +67,7 @@ inline Layout bookLayout(const Rect band, const int bookCount) {
   const int rowsY = l.recentHeading.y + l.recentHeading.height + 2;
   const int usableHeight = std::max(0, band.y + band.height - rowsY);
   constexpr int rowGap = 1;
-  const int rowHeight =
-      std::max(1, (usableHeight - rowGap * (LANDSCAPE_LIBRARY_ROWS - 1)) / LANDSCAPE_LIBRARY_ROWS);
+  const int rowHeight = std::max(1, (usableHeight - rowGap * (LANDSCAPE_LIBRARY_ROWS - 1)) / LANDSCAPE_LIBRARY_ROWS);
   for (int i = 0; i < LANDSCAPE_LIBRARY_ROWS; i++) {
     l.recent[i] = Rect{rightX, rowsY + i * (rowHeight + rowGap), rightWidth, rowHeight};
   }

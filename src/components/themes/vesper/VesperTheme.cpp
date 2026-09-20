@@ -193,8 +193,7 @@ void drawLandscapeRecents(const GfxRenderer& renderer, const VesperHome::Layout&
 
     const int textX = card.x + iconWidth;
     const int textWidth = std::max(1, card.width - iconWidth - 5);
-    const std::string title =
-        renderer.truncatedText(UI_10_FONT_ID, book.title.c_str(), textWidth, EpdFontFamily::BOLD);
+    const std::string title = renderer.truncatedText(UI_10_FONT_ID, book.title.c_str(), textWidth, EpdFontFamily::BOLD);
     renderer.drawText(UI_10_FONT_ID, textX, card.y + 3, title.c_str(), true, EpdFontFamily::BOLD);
 
     if (!book.author.empty()) {
