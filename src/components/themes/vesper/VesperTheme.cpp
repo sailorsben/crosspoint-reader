@@ -303,7 +303,8 @@ void VesperTheme::drawRecentBookCover(GfxRenderer& renderer, const Rect rect,
     }
 
     if (layout.recentCount > 0) {
-      drawSectionLabel(renderer, layout.recentHeading, tr(layout.landscape ? STR_LIBRARY : STR_MENU_RECENT_BOOKS));
+      const char* sectionLabel = layout.landscape ? tr(STR_LIBRARY) : tr(STR_MENU_RECENT_BOOKS);
+      drawSectionLabel(renderer, layout.recentHeading, sectionLabel);
       if (layout.dividerX >= 0) renderer.drawLine(layout.dividerX, rect.y, layout.dividerX, rect.y + rect.height - 1);
       if (layout.landscape)
         drawLandscapeRecents(renderer, layout, recentBooks);
