@@ -1,6 +1,7 @@
 #pragma once
 
 #include "activities/Activity.h"
+#include "components/themes/BaseTheme.h"
 
 class ImmersiveOptionsActivity final : public Activity {
  public:

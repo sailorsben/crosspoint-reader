@@ -15,6 +15,7 @@
 
 #include <algorithm>
 #include <cstdio>
+#include <cstring>
 
 #include "CrossPointSettings.h"
 #include "MappedInputManager.h"
@@ -162,6 +163,7 @@ int LibraryListActivity::selectedEntry() const {
 // list the reader narrowed down on purpose, and the ascending toggle asks for
 // oldest-first, which pinned fresh reads would contradict.
 int LibraryListActivity::pinnedCount() const {
+  if (usesVesperLibrary()) return 0;
   if (activeTabIndex != RECENT_TAB || !query.empty() || !isDescending(sortOrder)) return 0;
   return pinnedTotal;
 }
@@ -995,7 +997,7 @@ void LibraryListActivity::renderVesperHeader() {
   GUI.drawHeader(renderer, Rect{0, metrics.topPadding, sw, metrics.headerHeight}, tr(STR_HOME));
 
   const int iconY = metrics.topPadding + (metrics.headerHeight - 24) / 2;
-  renderer.drawIcon(Search24Icon, sw - 122, iconY, 24);
+  renderer.drawIcon(Search24IconBits, sw - 122, iconY, 24);
 
   // Sort icon: three descending horizontal strokes with a small direction cue.
   const int sx = sw - 78;
@@ -1012,7 +1014,7 @@ void LibraryListActivity::renderVesperSearchPill() {
   constexpr int h = 38;
   constexpr int x = 18;
   renderer.drawRoundedRect(x, y, sw - x * 2, h, 1, h / 2, true);
-  renderer.drawIcon(Search24Icon, x + 9, y + 7, 24);
+  renderer.drawIcon(Search24IconBits, x + 9, y + 7, 24);
   const char* placeholder = query.empty() ? tr(STR_LIBRARY_SEARCH) : query.c_str();
   const std::string shown = renderer.truncatedText(UI_10_FONT_ID, placeholder, sw - 110);
   renderer.drawText(UI_10_FONT_ID, x + 42, y + 8, shown.c_str(), true,
