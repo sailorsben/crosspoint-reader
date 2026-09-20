@@ -1,7 +1,10 @@
 #include "LibraryListActivity.h"
 
+#include <Epub.h>
 #include <FreeInkUIIcon.h>
+#include <FsHelpers.h>
 #include <GfxRenderer.h>
+#include <Xtc.h>
 #include <HalStorage.h>
 #include <I18n.h>
 #include <LibraryBuilder.h>
@@ -20,7 +23,9 @@
 #include "activities/util/KeyboardEntryActivity.h"
 #include "components/UIScale.h"
 #include "components/UITheme.h"
+#include "components/icons/search24.h"
 #include "components/icons/search32.h"
+#include "components/themes/vesper/VesperTheme.h"
 #include "fontIds.h"
 #include "util/BookCacheUtils.h"
 
@@ -99,6 +104,21 @@ void LibraryListActivity::onEnter() {
     LOG_ERR("LIB", "index was built without duplicate detection");
   }
   resolvePinned();
+
+  if (usesVesperLibrary()) {
+    activeTabIndex = TITLE_TAB;
+    sortOrder = library::SortOrder::TitleAsc;
+    descendingTabs &= static_cast<uint8_t>(~(1u << TITLE_TAB));
+    query.clear();
+    applyFilter();
+    vesperOffset = 0;
+    vesperSelected = 0;
+    vesperSearchSavedOffset = 0;
+    vesperSearchActive = false;
+    vesperKeyboardVisible = false;
+    vesperSortOpen = false;
+    vesperScrollOnlyRefresh = false;
+  }
 
   // Entered while Confirm was still held (typical when launched from the home
   // menu): ignore its release, or we would open whatever sits at row 0.
@@ -411,7 +431,10 @@ int LibraryListActivity::bookRowCount() const {
   return static_cast<int>(index.bookCount()) + (pinned > 0 ? pinned - overlapCount : 0);
 }
 
-int LibraryListActivity::listCount() const { return groupsCollapsed ? static_cast<int>(groupCount) : bookRowCount(); }
+int LibraryListActivity::listCount() const {
+  if (usesVesperLibrary()) return query.empty() ? static_cast<int>(index.bookCount()) : static_cast<int>(filteredCount);
+  return groupsCollapsed ? static_cast<int>(groupCount) : bookRowCount();
+}
 
 // Entry position on screen to row position in the sort order. Identity while
 // unfiltered and unpinned, so the shelf costs nothing when nothing is typed.
@@ -559,6 +582,11 @@ void LibraryListActivity::applyFilter() {
     author.clear();
     if (index.readAuthor(record, author) && library::matchesQuery(library::fold(author), needle)) {
       matches[matchCount++] = static_cast<uint16_t>(row);
+      continue;
+    }
+    std::string fileName;
+    if (index.readName(record, fileName) && library::matchesQuery(library::fold(fileName), needle)) {
+      matches[matchCount++] = static_cast<uint16_t>(row);
     }
   }
   filtered = std::move(matches);
@@ -599,6 +627,575 @@ bool LibraryListActivity::rowTextFor(const int entry, std::string& title, std::s
   }
   if (title.empty()) title = tr(STR_LIBRARY_UNKNOWN_TITLE);
   return true;
+}
+
+
+bool LibraryListActivity::usesVesperLibrary() const {
+  return SETTINGS.uiTheme == CrossPointSettings::UI_THEME::VESPERUI;
+}
+
+int LibraryListActivity::vesperVisibleCount() const {
+  if (renderer.getScreenWidth() > renderer.getScreenHeight()) return 3;  // two full + partial third
+  return 4;  // two columns x two rows
+}
+
+bool LibraryListActivity::pathForEntry(const int entry, std::string& path) {
+  path.clear();
+  if (!index.isOpen() || entry < 0 || entry >= listCount()) return false;
+  const uint16_t ordinal = index.ordinalForRow(sortOrder, static_cast<uint16_t>(rowFor(entry)));
+  library::ClixRecord record{};
+  return ordinal != 0xFFFF && index.readRecord(ordinal, record) && index.readPath(record, path);
+}
+
+void LibraryListActivity::openVesperEntry(const int entry) {
+  std::string path;
+  if (!pathForEntry(entry, path)) return;
+  app.clearTapFlash();
+  index.close();
+  onSelectBook(path);
+}
+
+void LibraryListActivity::setVesperSort(const library::SortOrder order) {
+  sortOrder = order;
+  if (order == library::SortOrder::TitleAsc || order == library::SortOrder::TitleDesc) {
+    activeTabIndex = TITLE_TAB;
+  } else if (order == library::SortOrder::AuthorAsc || order == library::SortOrder::AuthorDesc) {
+    activeTabIndex = AUTHOR_TAB;
+  } else {
+    activeTabIndex = RECENT_TAB;
+  }
+  applyFilter();
+  refreshOverlap();
+  vesperOffset = 0;
+  vesperSelected = 0;
+  vesperSortOpen = false;
+  requestUpdate(true);
+}
+
+void LibraryListActivity::openVesperSearch() {
+  if (vesperSearchActive) {
+    vesperKeyboardVisible = true;
+    requestUpdate();
+    return;
+  }
+  vesperSearchSavedOffset = vesperOffset;
+  vesperSearchActive = true;
+  vesperKeyboardVisible = true;
+  query.clear();
+  applyFilter();
+  vesperOffset = 0;
+  vesperSelected = 0;
+  requestUpdate(true);
+}
+
+void LibraryListActivity::closeVesperSearch(const bool restorePosition) {
+  if (!vesperSearchActive) return;
+  query.clear();
+  applyFilter();
+  vesperSearchActive = false;
+  vesperKeyboardVisible = false;
+  if (restorePosition) vesperOffset = std::clamp(vesperSearchSavedOffset, 0, std::max(0, listCount() - 1));
+  vesperSelected = vesperOffset;
+  requestUpdate(true);
+}
+
+void LibraryListActivity::updateVesperSearch(const std::string& next) {
+  query = next.substr(0, 48);
+  applyFilter();
+  vesperOffset = 0;
+  vesperSelected = 0;
+  requestUpdate(true);
+}
+
+void LibraryListActivity::loopVesper() {
+  const int count = listCount();
+  const int sw = renderer.getScreenWidth();
+  const int sh = renderer.getScreenHeight();
+  const bool landscape = sw > sh;
+  const auto& metrics = UITheme::getInstance().getMetrics();
+  const int headerBottom = metrics.topPadding + metrics.headerHeight;
+
+  if (mappedInput.wasReleased(MappedInputManager::Button::Back)) {
+    if (vesperSortOpen) {
+      vesperSortOpen = false;
+      requestUpdate();
+    } else if (vesperKeyboardVisible) {
+      vesperKeyboardVisible = false;
+      requestUpdate();
+    } else if (vesperSearchActive) {
+      closeVesperSearch(true);
+    } else {
+      onGoHome();
+    }
+    return;
+  }
+
+  if (mappedInput.wasReleased(MappedInputManager::Button::Confirm)) {
+    if (count > 0) openVesperEntry(std::clamp(vesperSelected, 0, count - 1));
+    return;
+  }
+
+  // Physical navigation follows the visible browsing axis.
+  if (mappedInput.wasReleased(MappedInputManager::Button::NavNext)) {
+    if (count > 0) {
+      const int step = landscape ? 1 : 2;
+      vesperOffset = std::min(std::max(0, count - 1), vesperOffset + step);
+      vesperSelected = vesperOffset;
+      vesperScrollOnlyRefresh = true;
+      requestUpdate(true);
+    }
+    return;
+  }
+  if (mappedInput.wasReleased(MappedInputManager::Button::NavPrevious)) {
+    if (count > 0) {
+      const int step = landscape ? 1 : 2;
+      vesperOffset = std::max(0, vesperOffset - step);
+      vesperSelected = vesperOffset;
+      vesperScrollOnlyRefresh = true;
+      requestUpdate(true);
+    }
+    return;
+  }
+
+  // Swiping is one book at a time in landscape, one row at a time in portrait.
+  const auto swipe = mappedInput.wasSwipe();
+  if (landscape && (swipe == MappedInputManager::SwipeDir::Left || swipe == MappedInputManager::SwipeDir::Right)) {
+    if (count > 0) {
+      const int delta = swipe == MappedInputManager::SwipeDir::Left ? 1 : -1;
+      vesperOffset = std::clamp(vesperOffset + delta, 0, std::max(0, count - 1));
+      vesperSelected = vesperOffset;
+      vesperScrollOnlyRefresh = true;
+      requestUpdate(true);
+    }
+    return;
+  }
+  if (!landscape && (swipe == MappedInputManager::SwipeDir::Up || swipe == MappedInputManager::SwipeDir::Down)) {
+    if (count > 0) {
+      const int delta = swipe == MappedInputManager::SwipeDir::Up ? 2 : -2;
+      vesperOffset = std::clamp(vesperOffset + delta, 0, std::max(0, count - 1));
+      vesperOffset &= ~1;
+      vesperSelected = vesperOffset;
+      vesperScrollOnlyRefresh = true;
+      requestUpdate(true);
+    }
+    return;
+  }
+
+  int tx = 0;
+  int ty = 0;
+  if (!mappedInput.wasScreenTapped(tx, ty)) return;
+
+  // Header: Home on the left; Search and Sort sit just left of the battery.
+  if (ty < headerBottom) {
+    if (tx < 92) {
+      onGoHome();
+      return;
+    }
+    if (tx >= sw - 132 && tx < sw - 88) {
+      if (vesperSearchActive)
+        closeVesperSearch(true);
+      else
+        openVesperSearch();
+      return;
+    }
+    if (tx >= sw - 88 && tx < sw - 44) {
+      vesperSortOpen = !vesperSortOpen;
+      vesperKeyboardVisible = false;
+      requestUpdate();
+      return;
+    }
+  }
+
+  if (vesperSortOpen) {
+    const int modalW = std::min(360, sw - 40);
+    const int rowH = 44;
+    const int modalH = rowH * 5 + 20;
+    const int mx = (sw - modalW) / 2;
+    const int my = (sh - modalH) / 2;
+    if (tx >= mx && tx < mx + modalW && ty >= my + 10 && ty < my + 10 + rowH * 5) {
+      const int row = (ty - (my + 10)) / rowH;
+      static constexpr library::SortOrder choices[5] = {
+          library::SortOrder::TitleAsc, library::SortOrder::TitleDesc, library::SortOrder::AuthorAsc,
+          library::SortOrder::AuthorDesc, library::SortOrder::RecentDesc};
+      setVesperSort(choices[std::clamp(row, 0, 4)]);
+    } else {
+      vesperSortOpen = false;
+      requestUpdate();
+    }
+    return;
+  }
+
+  if (vesperSearchActive) {
+    const int pillY = headerBottom + 6;
+    const int pillH = 38;
+    if (ty >= pillY && ty < pillY + pillH && tx >= sw - 52) {
+      closeVesperSearch(true);
+      return;
+    }
+  }
+
+  if (vesperKeyboardVisible) {
+    const int keyH = landscape ? 34 : 44;
+    const int gap = 3;
+    const int keyboardH = keyH * 5 + gap * 4;
+    const int ky0 = sh - keyboardH - 6;
+    if (ty >= ky0) {
+      static const char* rows[4] = {"qwertyuiop", "asdfghjkl", "zxcvbnm", "1234567890"};
+      for (int row = 0; row < 4; ++row) {
+        const int countKeys = static_cast<int>(strlen(rows[row]));
+        const int rowY = ky0 + row * (keyH + gap);
+        if (ty < rowY || ty >= rowY + keyH) continue;
+        const int pad = row == 1 ? 18 : (row == 2 ? 42 : 4);
+        const int usable = sw - pad * 2;
+        const int keyW = usable / countKeys;
+        const int col = (tx - pad) / std::max(1, keyW);
+        if (tx >= pad && col >= 0 && col < countKeys) {
+          std::string next = query;
+          next.push_back(rows[row][col]);
+          updateVesperSearch(next);
+        }
+        return;
+      }
+
+      const int actionY = ky0 + 4 * (keyH + gap);
+      if (ty >= actionY && ty < actionY + keyH) {
+        const int third = sw / 3;
+        if (tx < third) {
+          if (!query.empty()) {
+            std::string next = query;
+            next.pop_back();
+            updateVesperSearch(next);
+          }
+        } else if (tx < third * 2) {
+          std::string next = query;
+          next.push_back(' ');
+          updateVesperSearch(next);
+        } else {
+          vesperKeyboardVisible = false;
+          requestUpdate();
+        }
+        return;
+      }
+    }
+  }
+
+  // Cover hit testing mirrors renderVesper().
+  const int pillReserve = vesperSearchActive ? 50 : 0;
+  const int contentTop = headerBottom + 8 + pillReserve;
+  const int contentBottom = sh - (landscape ? 34 : 12);
+  if (landscape) {
+    const int titleH = 42;
+    const int coverH = std::max(120, std::min(315, contentBottom - contentTop - titleH));
+    const int coverW = std::max(90, std::min(220, coverH * 2 / 3));
+    const int x0 = 28;
+    const int visibleThird = coverW * 3 / 4;
+    const int step = std::max(coverW + 18, (sw - visibleThird - x0) / 2);
+    for (int slot = 0; slot < 3; ++slot) {
+      const int entry = vesperOffset + slot;
+      if (entry >= count) break;
+      const int x = x0 + slot * step;
+      if (tx >= x && tx < std::min(sw, x + coverW) && ty >= contentTop && ty < contentTop + coverH + titleH) {
+        vesperSelected = entry;
+        openVesperEntry(entry);
+        return;
+      }
+    }
+  } else {
+    constexpr int side = 22;
+    constexpr int gapX = 18;
+    constexpr int titleH = 40;
+    const int colW = (sw - side * 2 - gapX) / 2;
+    const int coverW = std::min(184, colW - 8);
+    const int coverH = std::min(270, coverW * 3 / 2);
+    const int rowH = coverH + titleH + 14;
+    for (int slot = 0; slot < 4; ++slot) {
+      const int entry = vesperOffset + slot;
+      if (entry >= count) break;
+      const int col = slot % 2;
+      const int row = slot / 2;
+      const int cellX = side + col * (colW + gapX);
+      const int x = cellX + (colW - coverW) / 2;
+      const int y = contentTop + row * rowH;
+      if (tx >= cellX && tx < cellX + colW && ty >= y && ty < y + coverH + titleH) {
+        vesperSelected = entry;
+        openVesperEntry(entry);
+        return;
+      }
+    }
+  }
+}
+
+void LibraryListActivity::loop() {
+  if (usesVesperLibrary()) {
+    loopVesper();
+    return;
+  }
+  UiTabListActivity::loop();
+}
+
+void LibraryListActivity::drawVesperCoverEntry(const int entry, const int x, const int y, const int width,
+                                               const int height, const int titleHeight, const bool selected) {
+  if (entry < 0 || entry >= listCount()) return;
+  std::string title;
+  std::string author;
+  std::string path;
+  if (!rowTextFor(entry, title, author) || !pathForEntry(entry, path)) return;
+
+  RecentBook book;
+  book.path = path;
+  book.title = title;
+  book.author = author;
+
+  if (FsHelpers::hasEpubExtension(path)) {
+    Epub epub(path, "/.crosspoint");
+    const std::string exact = epub.getThumbBmpPath(height);
+    if (Storage.exists(exact.c_str()))
+      book.coverBmpPath = exact;
+    else if (Storage.exists(epub.getCoverBmpPath().c_str()))
+      book.coverBmpPath = epub.getCoverBmpPath();
+    else
+      book.coverBmpPath = epub.getThumbBmpPath();
+  } else if (FsHelpers::hasXtcExtension(path)) {
+    Xtc xtc(path, "/.crosspoint");
+    const std::string exact = xtc.getThumbBmpPath(height);
+    if (Storage.exists(exact.c_str()))
+      book.coverBmpPath = exact;
+    else if (Storage.exists(xtc.getCoverBmpPath().c_str()))
+      book.coverBmpPath = xtc.getCoverBmpPath();
+    else
+      book.coverBmpPath = xtc.getThumbBmpPath();
+  }
+
+  const Rect cover{x, y, width, height};
+  if (!VesperTheme::drawBookCover(renderer, book, cover)) {
+    renderer.drawRect(x, y, width, height, 1, true);
+    const char* fallback = "BOOK";
+    const int fw = renderer.getTextWidth(UI_10_FONT_ID, fallback, EpdFontFamily::BOLD);
+    renderer.drawText(UI_10_FONT_ID, x + (width - fw) / 2,
+                      y + (height - renderer.getLineHeight(UI_10_FONT_ID)) / 2, fallback, true,
+                      EpdFontFamily::BOLD);
+  } else {
+    renderer.drawRect(x, y, width, height, 1, true);
+  }
+
+  const int textY = y + height + 5;
+  const std::string titleLine =
+      renderer.truncatedText(UI_10_FONT_ID, title.c_str(), width, EpdFontFamily::BOLD);
+  renderer.drawText(UI_10_FONT_ID, x, textY, titleLine.c_str(), true, EpdFontFamily::BOLD);
+  if (!author.empty()) {
+    const std::string authorLine = renderer.truncatedText(SMALL_FONT_ID, author.c_str(), width);
+    renderer.drawText(SMALL_FONT_ID, x, textY + renderer.getLineHeight(UI_10_FONT_ID) + 1, authorLine.c_str());
+  }
+  if (selected) renderer.drawRect(x - 3, y - 3, width + 6, height + titleHeight + 3, 2, true);
+}
+
+void LibraryListActivity::renderVesperHeader() {
+  const auto& metrics = UITheme::getInstance().getMetrics();
+  const int sw = renderer.getScreenWidth();
+  GUI.drawHeader(renderer, Rect{0, metrics.topPadding, sw, metrics.headerHeight}, tr(STR_HOME));
+
+  const int iconY = metrics.topPadding + (metrics.headerHeight - 24) / 2;
+  renderer.drawIcon(Search24Icon, sw - 122, iconY, 24);
+
+  // Sort icon: three descending horizontal strokes with a small direction cue.
+  const int sx = sw - 78;
+  renderer.drawLine(sx, iconY + 4, sx + 22, iconY + 4, 2, true);
+  renderer.drawLine(sx + 4, iconY + 11, sx + 22, iconY + 11, 2, true);
+  renderer.drawLine(sx + 8, iconY + 18, sx + 22, iconY + 18, 2, true);
+}
+
+void LibraryListActivity::renderVesperSearchPill() {
+  if (!vesperSearchActive) return;
+  const auto& metrics = UITheme::getInstance().getMetrics();
+  const int sw = renderer.getScreenWidth();
+  const int y = metrics.topPadding + metrics.headerHeight + 6;
+  constexpr int h = 38;
+  constexpr int x = 18;
+  renderer.drawRoundedRect(x, y, sw - x * 2, h, 1, h / 2, true);
+  renderer.drawIcon(Search24Icon, x + 9, y + 7, 24);
+  const char* placeholder = query.empty() ? tr(STR_LIBRARY_SEARCH) : query.c_str();
+  const std::string shown = renderer.truncatedText(UI_10_FONT_ID, placeholder, sw - 110);
+  renderer.drawText(UI_10_FONT_ID, x + 42, y + 8, shown.c_str(), true,
+                    query.empty() ? EpdFontFamily::REGULAR : EpdFontFamily::BOLD);
+  const char* close = "×";
+  renderer.drawText(UI_12_FONT_ID, sw - 43, y + 6, close, true, EpdFontFamily::BOLD);
+}
+
+void LibraryListActivity::renderVesperKeyboard() {
+  if (!vesperKeyboardVisible) return;
+  const int sw = renderer.getScreenWidth();
+  const int sh = renderer.getScreenHeight();
+  const bool landscape = sw > sh;
+  const int keyH = landscape ? 34 : 44;
+  constexpr int gap = 3;
+  const int keyboardH = keyH * 5 + gap * 4;
+  const int ky0 = sh - keyboardH - 6;
+  renderer.fillRect(0, ky0 - 3, sw, keyboardH + 9, false);
+  renderer.drawLine(0, ky0 - 3, sw - 1, ky0 - 3);
+
+  static const char* rows[4] = {"QWERTYUIOP", "ASDFGHJKL", "ZXCVBNM", "1234567890"};
+  for (int row = 0; row < 4; ++row) {
+    const int n = static_cast<int>(strlen(rows[row]));
+    const int pad = row == 1 ? 18 : (row == 2 ? 42 : 4);
+    const int usable = sw - pad * 2;
+    const int keyW = usable / n;
+    const int y = ky0 + row * (keyH + gap);
+    for (int col = 0; col < n; ++col) {
+      const int x = pad + col * keyW;
+      renderer.drawRoundedRect(x + 1, y, keyW - 2, keyH, 1, 3, true);
+      char label[2] = {rows[row][col], 0};
+      const int tw = renderer.getTextWidth(SMALL_FONT_ID, label, EpdFontFamily::BOLD);
+      renderer.drawText(SMALL_FONT_ID, x + (keyW - tw) / 2,
+                        y + (keyH - renderer.getLineHeight(SMALL_FONT_ID)) / 2, label, true, EpdFontFamily::BOLD);
+    }
+  }
+
+  const int actionY = ky0 + 4 * (keyH + gap);
+  const int third = sw / 3;
+  const char* labels[3] = {"Del", "Space", "Done"};
+  for (int i = 0; i < 3; ++i) {
+    renderer.drawRoundedRect(i * third + 2, actionY, third - 4, keyH, 1, 3, true);
+    const int tw = renderer.getTextWidth(UI_10_FONT_ID, labels[i], EpdFontFamily::BOLD);
+    renderer.drawText(UI_10_FONT_ID, i * third + (third - tw) / 2,
+                      actionY + (keyH - renderer.getLineHeight(UI_10_FONT_ID)) / 2, labels[i], true,
+                      EpdFontFamily::BOLD);
+  }
+}
+
+void LibraryListActivity::renderVesperSortOverlay() {
+  if (!vesperSortOpen) return;
+  const int sw = renderer.getScreenWidth();
+  const int sh = renderer.getScreenHeight();
+  const int modalW = std::min(360, sw - 40);
+  constexpr int rowH = 44;
+  const int modalH = rowH * 5 + 20;
+  const int mx = (sw - modalW) / 2;
+  const int my = (sh - modalH) / 2;
+  renderer.fillRect(mx, my, modalW, modalH, false);
+  renderer.drawRect(mx, my, modalW, modalH, 2, true);
+
+  static const char* labels[5] = {"Title A-Z", "Title Z-A", "Author A-Z", "Author Z-A", "Recently Added"};
+  static constexpr library::SortOrder choices[5] = {
+      library::SortOrder::TitleAsc, library::SortOrder::TitleDesc, library::SortOrder::AuthorAsc,
+      library::SortOrder::AuthorDesc, library::SortOrder::RecentDesc};
+
+  for (int i = 0; i < 5; ++i) {
+    const int y = my + 10 + i * rowH;
+    if (sortOrder == choices[i]) renderer.fillRectDither(mx + 5, y + 2, modalW - 10, rowH - 4, Color::LightGray);
+    renderer.drawText(UI_10_FONT_ID, mx + 18, y + (rowH - renderer.getLineHeight(UI_10_FONT_ID)) / 2, labels[i],
+                      true, EpdFontFamily::BOLD);
+    if (i < 4) renderer.drawLine(mx + 10, y + rowH - 1, mx + modalW - 11, y + rowH - 1);
+  }
+}
+
+void LibraryListActivity::renderVesper() {
+  const int sw = renderer.getScreenWidth();
+  const int sh = renderer.getScreenHeight();
+  const bool landscape = sw > sh;
+  const auto& metrics = UITheme::getInstance().getMetrics();
+  const int headerBottom = metrics.topPadding + metrics.headerHeight;
+  const int pillReserve = vesperSearchActive ? 50 : 0;
+  const int contentTop = headerBottom + 8 + pillReserve;
+  const int contentBottom = sh - (landscape ? 34 : 12);
+  const int count = listCount();
+
+  // A scroll can use a true window update: leave the header physically
+  // untouched and rebuild only the browsing surface + its position indicator.
+  if (!vesperScrollOnlyRefresh) {
+    renderer.clearScreen();
+    renderVesperHeader();
+    renderVesperSearchPill();
+  } else {
+    renderer.fillRect(0, contentTop, sw, std::max(1, contentBottom - contentTop + (landscape ? 32 : 0)), false);
+  }
+
+  if (filterFailed) {
+    renderer.drawCenteredText(UI_12_FONT_ID, (contentTop + contentBottom) / 2, tr(STR_LIBRARY_SEARCH_UNAVAILABLE), true,
+                              EpdFontFamily::BOLD);
+  } else if (count <= 0) {
+    renderer.drawCenteredText(UI_12_FONT_ID, (contentTop + contentBottom) / 2,
+                              query.empty() ? tr(STR_LIBRARY_EMPTY) : tr(STR_LIBRARY_NO_RESULTS), true,
+                              EpdFontFamily::BOLD);
+  } else if (landscape) {
+    constexpr int titleH = 42;
+    const int coverH = std::max(120, std::min(315, contentBottom - contentTop - titleH));
+    const int coverW = std::max(90, std::min(220, coverH * 2 / 3));
+    const int x0 = 28;
+    const int visibleThird = coverW * 3 / 4;
+    const int step = std::max(coverW + 18, (sw - visibleThird - x0) / 2);
+
+    renderer.setClipRect(0, contentTop, sw, std::max(1, contentBottom - contentTop));
+    for (int slot = 0; slot < 3; ++slot) {
+      const int entry = vesperOffset + slot;
+      if (entry >= count) break;
+      drawVesperCoverEntry(entry, x0 + slot * step, contentTop, coverW, coverH, titleH, entry == vesperSelected);
+    }
+    renderer.setClipRect(0, 0, sw, sh);
+
+    // Horizontal position indicator. The number is the leftmost full book.
+    constexpr int trackX = 32;
+    const int readoutW = 78;
+    const int trackRight = sw - readoutW - 22;
+    const int trackY = sh - 18;
+    renderer.drawLine(trackX, trackY, trackRight, trackY, 1, true);
+    const int trackW = std::max(1, trackRight - trackX);
+    const int thumbW = std::max(24, trackW * std::min(2, count) / std::max(1, count));
+    const int maxOffset = std::max(1, count - 1);
+    const int thumbX = trackX + (trackW - thumbW) * std::clamp(vesperOffset, 0, maxOffset) / maxOffset;
+    renderer.fillRect(thumbX, trackY - 2, thumbW, 5, true);
+    char pos[24];
+    snprintf(pos, sizeof(pos), "%d / %d", std::min(count, vesperOffset + 1), count);
+    renderer.drawText(SMALL_FONT_ID, sw - readoutW, sh - 25, pos, true, EpdFontFamily::BOLD);
+  } else {
+    constexpr int side = 22;
+    constexpr int gapX = 18;
+    constexpr int titleH = 40;
+    const int colW = (sw - side * 2 - gapX) / 2;
+    const int coverW = std::min(184, colW - 8);
+    const int coverH = std::min(270, coverW * 3 / 2);
+    const int rowH = coverH + titleH + 14;
+
+    for (int slot = 0; slot < 4; ++slot) {
+      const int entry = vesperOffset + slot;
+      if (entry >= count) break;
+      const int col = slot % 2;
+      const int row = slot / 2;
+      const int cellX = side + col * (colW + gapX);
+      const int x = cellX + (colW - coverW) / 2;
+      const int y = contentTop + row * rowH;
+      if (y + coverH > contentBottom) break;
+      drawVesperCoverEntry(entry, x, y, coverW, coverH, titleH, entry == vesperSelected);
+    }
+
+    // Portrait uses only a vertical scroll indicator, no count.
+    if (count > 4) {
+      const int trackX = sw - 7;
+      const int trackY = contentTop;
+      const int trackH = std::max(1, contentBottom - contentTop);
+      renderer.drawLine(trackX, trackY, trackX, trackY + trackH - 1, 1, true);
+      const int thumbH = std::max(30, trackH * 4 / count);
+      const int maxOffset = std::max(1, count - 4);
+      const int thumbY = trackY + (trackH - thumbH) * std::clamp(vesperOffset, 0, maxOffset) / maxOffset;
+      renderer.fillRect(trackX - 1, thumbY, 3, thumbH, true);
+    }
+  }
+
+  if (!vesperScrollOnlyRefresh) {
+    renderVesperSortOverlay();
+    renderVesperKeyboard();
+    renderer.displayBuffer(HalDisplay::FAST_REFRESH);
+  } else {
+    renderer.displayWindow(0, contentTop, sw, std::max(1, sh - contentTop));
+    vesperScrollOnlyRefresh = false;
+  }
+}
+
+void LibraryListActivity::render(RenderLock&& lock) {
+  if (usesVesperLibrary()) {
+    renderVesper();
+    return;
+  }
+  UiTabListActivity::render(std::move(lock));
 }
 
 bool LibraryListActivity::handleCustomInput() {

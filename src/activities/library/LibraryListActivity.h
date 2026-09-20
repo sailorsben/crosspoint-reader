@@ -34,6 +34,8 @@ class LibraryListActivity final : public UiTabListActivity {
 
   void onEnter() override;
   void onExit() override;
+  void loop() override;
+  void render(RenderLock&& lock) override;
 
  protected:
   // --- UiListActivity / UiTabListActivity contract ---------------------------
@@ -167,4 +169,30 @@ class LibraryListActivity final : public UiTabListActivity {
 
   bool lockNextConfirmRelease = false;
   bool lockNextBackRelease = false;
+
+  // VesperUI cover-first library state. The legacy list implementation remains
+  // intact for every other theme.
+  int vesperOffset = 0;
+  int vesperSelected = 0;
+  int vesperSearchSavedOffset = 0;
+  bool vesperSearchActive = false;
+  bool vesperKeyboardVisible = false;
+  bool vesperSortOpen = false;
+  bool vesperScrollOnlyRefresh = false;
+
+  bool usesVesperLibrary() const;
+  void loopVesper();
+  void renderVesper();
+  void renderVesperHeader();
+  void renderVesperSearchPill();
+  void renderVesperKeyboard();
+  void renderVesperSortOverlay();
+  void drawVesperCoverEntry(int entry, int x, int y, int width, int height, int titleHeight, bool selected);
+  bool pathForEntry(int entry, std::string& path);
+  void openVesperEntry(int entry);
+  void setVesperSort(library::SortOrder order);
+  void openVesperSearch();
+  void closeVesperSearch(bool restorePosition);
+  void updateVesperSearch(const std::string& next);
+  int vesperVisibleCount() const;
 };
