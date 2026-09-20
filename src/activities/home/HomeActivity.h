@@ -29,9 +29,17 @@ class HomeActivity final : public Activity {
   int coverRectW = 0;
   int coverRectH = 0;
   std::vector<RecentBook> recentBooks;
-  static constexpr int VESPER_LIBRARY_VISIBLE_ROWS = 6;
-  int vesperLibraryOffset = 0;
-  int vesperLibraryTotal = 0;
+  // Vesper landscape keeps the true MRU list separate from the hero/window so
+  // promoting a book never destroys the recent ordering.
+  std::vector<RecentBook> vesperRecentBooks;
+  RecentBook vesperHeroBook;
+  bool vesperHeroValid = false;
+  static constexpr int VESPER_RECENT_VISIBLE_ROWS = 5;
+  int vesperRecentOffset = 0;
+  int vesperRecentTotal = 0;
+  bool vesperRecentPaneOnlyRefresh = false;
+  std::string lastVesperTapPath;
+  unsigned long lastVesperTapAt = 0;
   const HomeMenuItem initialMenuItem;
   const bool cleanInitialRefresh;
 
@@ -74,9 +82,10 @@ class HomeActivity final : public Activity {
   void loadRecentBooks(int maxBooks);
   void loadRecentCovers(int coverHeight);
   bool usesVesperLibraryPane() const;
-  bool loadVesperLibraryWindow();
-  void scrollVesperLibrary(int delta);
+  bool rebuildVesperRecentWindow();
+  void scrollVesperRecent(int delta);
   void toggleVesperInterfaceOrientation();
+  bool renderVesperRecentPaneOnly();
   void promoteRecentToHero(int index);
   void loadVesperProgress(RecentBook& book);
   bool drawVesperCoverArt();

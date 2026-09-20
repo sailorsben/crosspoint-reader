@@ -6,7 +6,7 @@
 
 namespace VesperHome {
 
-inline constexpr int LANDSCAPE_LIBRARY_ROWS = 6;
+inline constexpr int LANDSCAPE_LIBRARY_ROWS = 5;
 
 struct Layout {
   bool landscape = false;
@@ -15,6 +15,7 @@ struct Layout {
   Rect heroCover;
   Rect heroText;
   Rect recentHeading;
+  Rect recentPane;
   Rect recent[LANDSCAPE_LIBRARY_ROWS];
   int recentCount = 0;
   int dividerX = -1;
@@ -64,6 +65,7 @@ inline Layout bookLayout(const Rect band, const int bookCount) {
   const int rightX = l.dividerX + gap;
   const int rightWidth = band.x + band.width - rightX - pad;
   l.recentHeading = Rect{rightX, band.y, rightWidth, 24};
+  l.recentPane = Rect{rightX, band.y, rightWidth, band.height};
   const int rowsY = l.recentHeading.y + l.recentHeading.height + 2;
   const int usableHeight = std::max(0, band.y + band.height - rowsY);
   constexpr int rowGap = 1;

@@ -26,7 +26,7 @@ constexpr ThemeMetrics baseValues = {
     .listTitleBold = false,
     .headerSidePadding = 14,
     .headerUnderlineSize = 1,
-    .headerTitleAlign = 1,
+    .headerTitleAlign = 0,
     .headerBatterySide = 0,
     .headerBatteryDetached = true,
     .menuRowHeight = 50,
@@ -111,6 +111,8 @@ class VesperTheme final : public LyraTheme {
   // Draws only the cover pixels, respecting the current renderer mode. Home
   // reuses this for the LSB/MSB grayscale passes.
   static bool drawBookCover(const GfxRenderer& renderer, const RecentBook& book, Rect target);
+  static Rect drawHomeRecentPane(GfxRenderer& renderer, Rect band, const std::vector<RecentBook>& recentBooks,
+                                 int selectorIndex, int totalBooks, int offset, bool clearPane);
 
   void drawHeader(const GfxRenderer& renderer, Rect rect, const char* title,
                   const char* subtitle = nullptr) const override;

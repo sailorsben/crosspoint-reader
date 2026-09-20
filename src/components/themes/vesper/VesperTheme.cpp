@@ -192,7 +192,7 @@ void drawLandscapeRecents(const GfxRenderer& renderer, const VesperHome::Layout&
     drawLibraryBookGlyph(renderer, card.x + 4, iconY);
 
     const int textX = card.x + iconWidth;
-    const int textWidth = std::max(1, card.width - iconWidth - 5);
+    const int textWidth = std::max(1, card.width - iconWidth - 12);
     const std::string title = renderer.truncatedText(UI_10_FONT_ID, book.title.c_str(), textWidth, EpdFontFamily::BOLD);
     renderer.drawText(UI_10_FONT_ID, textX, card.y + 3, title.c_str(), true, EpdFontFamily::BOLD);
 
@@ -242,17 +242,16 @@ void VesperTheme::drawHeader(const GfxRenderer& renderer, const Rect rect, const
                              const char* subtitle) const {
   BaseTheme::drawHeader(renderer, rect, title, subtitle);
 
-  // VesperUI wordmark: the approved feathered mark is literally the "V".
-  constexpr int logoSize = 42;
-  constexpr int leftInset = 9;
-  constexpr int wordGap = 3;
-  const int logoX = rect.x + leftInset;
+  constexpr int logoSize = 30;
+  constexpr int wordGap = 7;
+  constexpr const char* word = "VESPER UI";
+  const int wordWidth = renderer.getTextWidth(NOTOSERIF_12_FONT_ID, word, EpdFontFamily::REGULAR);
+  const int groupWidth = logoSize + wordGap + wordWidth;
+  const int logoX = rect.x + (rect.width - groupWidth) / 2;
   const int logoY = rect.y + std::max(0, (rect.height - logoSize) / 2);
   drawVesperLogo(renderer, logoX, logoY, logoSize);
-
-  constexpr const char* word = "esperUI";
-  const int wordY = rect.y + (rect.height - renderer.getLineHeight(UI_10_FONT_ID)) / 2;
-  renderer.drawText(UI_10_FONT_ID, logoX + logoSize + wordGap, wordY, word, true, EpdFontFamily::BOLD);
+  const int wordY = rect.y + (rect.height - renderer.getLineHeight(NOTOSERIF_12_FONT_ID)) / 2;
+  renderer.drawText(NOTOSERIF_12_FONT_ID, logoX + logoSize + wordGap, wordY, word, true, EpdFontFamily::REGULAR);
 }
 
 void VesperTheme::drawRecentBookCover(GfxRenderer& renderer, const Rect rect,
@@ -303,13 +302,10 @@ void VesperTheme::drawRecentBookCover(GfxRenderer& renderer, const Rect rect,
     }
 
     if (layout.recentCount > 0) {
-      const char* sectionLabel = layout.landscape ? tr(STR_LIBRARY) : tr(STR_MENU_RECENT_BOOKS);
-      drawSectionLabel(renderer, layout.recentHeading, sectionLabel);
-      if (layout.dividerX >= 0) renderer.drawLine(layout.dividerX, rect.y, layout.dividerX, rect.y + rect.height - 1);
-      if (layout.landscape)
-        drawLandscapeRecents(renderer, layout, recentBooks);
-      else
+      if (!layout.landscape) {
+        drawSectionLabel(renderer, layout.recentHeading, tr(STR_MENU_RECENT_BOOKS));
         drawPortraitRecents(renderer, layout, recentBooks);
+      }
     }
 
     coverBufferStored = storeCoverBuffer();
@@ -319,13 +315,52 @@ void VesperTheme::drawRecentBookCover(GfxRenderer& renderer, const Rect rect,
 
   if (selectorIndex == 0) {
     renderer.drawRect(layout.hero.x, layout.hero.y, layout.hero.width, layout.hero.height, 2, true);
-  } else {
+  } else if (!layout.landscape) {
     const int recentIndex = selectorIndex - 1;
     if (recentIndex >= 0 && recentIndex < layout.recentCount) {
       const Rect card = layout.recent[recentIndex];
       renderer.drawRect(card.x, card.y, card.width, card.height, 2, true);
     }
   }
+}
+
+Rect VesperTheme::drawHomeRecentPane(GfxRenderer& renderer, const Rect band,
+                                     const std::vector<RecentBook>& recentBooks, const int selectorIndex,
+                                     const int totalBooks, const int offset, const bool clearPane) {
+  const auto layout = VesperHome::bookLayout(band, static_cast<int>(recentBooks.size()));
+  if (!layout.landscape || layout.recentPane.width <= 0 || layout.recentPane.height <= 0) return {};
+
+  if (clearPane) {
+    renderer.fillRect(layout.recentPane.x, layout.recentPane.y, layout.recentPane.width, layout.recentPane.height,
+                      false);
+  }
+  if (layout.dividerX >= 0) renderer.drawLine(layout.dividerX, band.y, layout.dividerX, band.y + band.height - 1);
+  drawSectionLabel(renderer, layout.recentHeading, tr(STR_MENU_RECENT_BOOKS));
+  drawLandscapeRecents(renderer, layout, recentBooks);
+
+  if (selectorIndex > 0) {
+    const int recentIndex = selectorIndex - 1;
+    if (recentIndex >= 0 && recentIndex < layout.recentCount) {
+      const Rect card = layout.recent[recentIndex];
+      renderer.drawRect(card.x, card.y, std::max(1, card.width - 7), card.height, 2, true);
+    }
+  }
+
+  if (totalBooks > VesperHome::LANDSCAPE_LIBRARY_ROWS) {
+    const int trackX = layout.recentPane.x + layout.recentPane.width - 3;
+    const int trackY = layout.recentHeading.y + layout.recentHeading.height + 3;
+    const int trackH = std::max(1, layout.recentPane.y + layout.recentPane.height - trackY - 3);
+    renderer.drawLine(trackX, trackY, trackX, trackY + trackH - 1, 1, true);
+
+    const int visible = VesperHome::LANDSCAPE_LIBRARY_ROWS;
+    const int thumbH = std::max(18, trackH * visible / std::max(1, totalBooks));
+    const int maxOffset = std::max(1, totalBooks - visible);
+    const int thumbTravel = std::max(0, trackH - thumbH);
+    const int thumbY = trackY + thumbTravel * std::clamp(offset, 0, maxOffset) / maxOffset;
+    renderer.fillRect(trackX - 1, thumbY, 3, thumbH, true);
+  }
+
+  return layout.recentPane;
 }
 
 void VesperTheme::drawButtonMenu(GfxRenderer& renderer, const Rect rect, const int buttonCount, const int selectedIndex,
