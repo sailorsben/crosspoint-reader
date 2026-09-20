@@ -267,7 +267,7 @@ class CrossPointSettings : public PersistableStore<CrossPointSettings> {
   uint8_t doubleClickPwrLight = 1;
   uint8_t homeButtonTapAction = static_cast<uint8_t>(HomeButtonAction::Home);
   uint8_t homeButtonDoubleTapAction = static_cast<uint8_t>(HomeButtonAction::ToggleFrontlight);
-  uint8_t homeButtonLongPressAction = static_cast<uint8_t>(HomeButtonAction::ReaderMenu);
+  uint8_t homeButtonLongPressAction = static_cast<uint8_t>(HomeButtonAction::ToggleWholeDeviceOrientation);
   // EPUB reading orientation settings
   // 0 = portrait (default), 1 = landscape clockwise, 2 = inverted, 3 = landscape counter-clockwise
   uint8_t orientation = PORTRAIT;
@@ -319,6 +319,10 @@ class CrossPointSettings : public PersistableStore<CrossPointSettings> {
   uint8_t uiTheme = VESPERUI;
   // Orientation for Home, Library, Settings and other non-reader UI.
   uint8_t interfaceOrientation = UI_PORTRAIT;
+  // Reader-orientation enum value (LANDSCAPE_CW or LANDSCAPE_CCW) remembered
+  // across portrait toggles so orientation shortcuts return to the side the
+  // user actually chose last.
+  uint8_t lastLandscapeOrientation = LANDSCAPE_CW;
   // Sunlight fading compensation
   uint8_t fadingFix = 0;
   // Power button return from footnotes (1 = enabled, 0 = disabled)

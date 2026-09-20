@@ -93,18 +93,81 @@ void ActivityManager::loop() {
   if (currentActivity) {
     currentActivity->applyDisplayOrientation();
 
-    if (mappedInput.homeButtonAction() == HomeButtonAction::ToggleInterfaceOrientation) {
-      SETTINGS.interfaceOrientation = SETTINGS.interfaceOrientation == CrossPointSettings::UI_PORTRAIT
-                                          ? CrossPointSettings::UI_LANDSCAPE_CW
-                                          : CrossPointSettings::UI_PORTRAIT;
+    const HomeButtonAction homeAction = mappedInput.homeButtonAction();
+    if (homeAction == HomeButtonAction::ToggleInterfaceOrientation ||
+        homeAction == HomeButtonAction::ToggleReaderOrientation ||
+        homeAction == HomeButtonAction::ToggleWholeDeviceOrientation) {
+      const auto rememberRendererLandscape = [this]() {
+        if (renderer.getOrientation() == GfxRenderer::Orientation::LandscapeCounterClockwise) {
+          SETTINGS.lastLandscapeOrientation = CrossPointSettings::LANDSCAPE_CCW;
+        } else if (renderer.getOrientation() == GfxRenderer::Orientation::LandscapeClockwise) {
+          SETTINGS.lastLandscapeOrientation = CrossPointSettings::LANDSCAPE_CW;
+        }
+      };
+      const auto savedReaderLandscape = []() {
+        return SETTINGS.lastLandscapeOrientation == CrossPointSettings::LANDSCAPE_CCW
+                   ? CrossPointSettings::LANDSCAPE_CCW
+                   : CrossPointSettings::LANDSCAPE_CW;
+      };
+      const auto savedInterfaceLandscape = []() {
+        return SETTINGS.lastLandscapeOrientation == CrossPointSettings::LANDSCAPE_CCW
+                   ? CrossPointSettings::UI_LANDSCAPE_CCW
+                   : CrossPointSettings::UI_LANDSCAPE_CW;
+      };
+
+      if (homeAction == HomeButtonAction::ToggleReaderOrientation) {
+        if (SETTINGS.orientation == CrossPointSettings::LANDSCAPE_CW ||
+            SETTINGS.orientation == CrossPointSettings::LANDSCAPE_CCW) {
+          SETTINGS.lastLandscapeOrientation = SETTINGS.orientation;
+          SETTINGS.orientation = CrossPointSettings::PORTRAIT;
+        } else {
+          SETTINGS.orientation = savedReaderLandscape();
+        }
+        SETTINGS.saveToFile();
+        if (currentActivity->isReaderActivity()) {
+          currentActivity->applyDisplayOrientation();
+          requestUpdate();
+        }
+        return;
+      }
+
+      if (homeAction == HomeButtonAction::ToggleInterfaceOrientation) {
+        if (SETTINGS.interfaceOrientation == CrossPointSettings::UI_LANDSCAPE_CW) {
+          SETTINGS.lastLandscapeOrientation = CrossPointSettings::LANDSCAPE_CW;
+          SETTINGS.interfaceOrientation = CrossPointSettings::UI_PORTRAIT;
+        } else if (SETTINGS.interfaceOrientation == CrossPointSettings::UI_LANDSCAPE_CCW) {
+          SETTINGS.lastLandscapeOrientation = CrossPointSettings::LANDSCAPE_CCW;
+          SETTINGS.interfaceOrientation = CrossPointSettings::UI_PORTRAIT;
+        } else {
+          SETTINGS.interfaceOrientation = savedInterfaceLandscape();
+        }
+        SETTINGS.saveToFile();
+
+        if (currentActivity->isHomeActivity()) {
+          goHome();
+        } else if (!currentActivity->isReaderActivity()) {
+          currentActivity->applyDisplayOrientation();
+          requestUpdate();
+        }
+        return;
+      }
+
+      const bool currentlyLandscape =
+          renderer.getOrientation() == GfxRenderer::Orientation::LandscapeClockwise ||
+          renderer.getOrientation() == GfxRenderer::Orientation::LandscapeCounterClockwise;
+      if (currentlyLandscape) {
+        rememberRendererLandscape();
+        SETTINGS.orientation = CrossPointSettings::PORTRAIT;
+        SETTINGS.interfaceOrientation = CrossPointSettings::UI_PORTRAIT;
+      } else {
+        SETTINGS.orientation = savedReaderLandscape();
+        SETTINGS.interfaceOrientation = savedInterfaceLandscape();
+      }
       SETTINGS.saveToFile();
 
-      // Reader pages own their own orientation. Home also owns an orientation-
-      // specific book model (hero + landscape library window), so rebuild it
-      // rather than merely rotating the old layout in place.
       if (currentActivity->isHomeActivity()) {
         goHome();
-      } else if (!currentActivity->isReaderActivity()) {
+      } else {
         currentActivity->applyDisplayOrientation();
         requestUpdate();
       }

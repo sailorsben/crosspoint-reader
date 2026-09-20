@@ -16,6 +16,8 @@ enum class HomeButtonAction : uint8_t {
   ReaderMenu,
   ToggleFrontlight,
   ToggleInterfaceOrientation,
+  ToggleReaderOrientation,
+  ToggleWholeDeviceOrientation,
   Count
 };
 

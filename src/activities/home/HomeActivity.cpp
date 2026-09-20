@@ -469,16 +469,6 @@ void HomeActivity::loop() {
   const int menuCount = getMenuItemCount();
   const auto& metrics = UITheme::getInstance().getMetrics();
 
-  if (SETTINGS.uiTheme == CrossPointSettings::UI_THEME::VESPERUI &&
-      SETTINGS.longPressButtonBehavior == CrossPointSettings::ORIENTATION_CHANGE) {
-    int longX = 0;
-    int longY = 0;
-    if (mappedInput.wasScreenLongPress(longX, longY)) {
-      toggleVesperInterfaceOrientation();
-      return;
-    }
-  }
-
   auto activateSelection = [this] {
     if (selectorIndex < static_cast<int>(recentBooks.size())) {
       if (SETTINGS.uiTheme == CrossPointSettings::UI_THEME::VESPERUI && selectorIndex > 0) {
