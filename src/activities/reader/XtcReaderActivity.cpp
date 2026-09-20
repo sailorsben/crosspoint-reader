@@ -396,12 +396,10 @@ void XtcReaderActivity::renderPage() {
 
     renderer.clearScreen(0x00);
     renderLevel(1);
-    if (vesper) drawVesperFooter();
     renderer.copyGrayscaleLsbBuffers();
 
     renderer.clearScreen(0x00);
     renderLevel(2);
-    if (vesper) drawVesperFooter();
     renderer.copyGrayscaleMsbBuffers();
 
     renderer.displayGrayBuffer();

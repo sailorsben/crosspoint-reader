@@ -108,6 +108,13 @@ class EpubReaderActivity final : public ReaderActivity {
   uint16_t buildViewportHeight = 0;
   bool partialRebuildStartFailed = false;
 
+  // VesperUI shows a whole-book page number even though EPUB pagination is
+  // chapter-local. Estimate the denominator once per layout and keep it stable
+  // while reading; otherwise chapter changes make "Page X / Y" visibly jump.
+  mutable int vesperEstimatedBookPages = 0;
+  mutable uint16_t vesperEstimateViewportWidth = 0;
+  mutable uint16_t vesperEstimateViewportHeight = 0;
+
   int lastSavedSpineIndex = -1;
   int lastSavedPage = -1;
   int lastSavedPageCount = -1;

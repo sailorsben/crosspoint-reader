@@ -1041,6 +1041,9 @@ void EpubReaderActivity::applyOrientation(const uint8_t orientation) {
   }
   ReaderUtils::applyOrientation(renderer, SETTINGS.orientation);
   appliedOrientation = orientation;
+  vesperEstimatedBookPages = 0;
+  vesperEstimateViewportWidth = 0;
+  vesperEstimateViewportHeight = 0;
   section.reset();
 }
 
@@ -1804,15 +1807,27 @@ void EpubReaderActivity::renderStatusBar() const {
   if (SETTINGS.uiTheme == CrossPointSettings::UI_THEME::VESPERUI) {
     if (!immersiveFooterVisible() || !epub) return;
 
-    int totalBookPages = std::max(1, static_cast<int>(pageCount));
-    const size_t bookBytes = epub->getBookSize();
-    const size_t previousBytes = currentSpineIndex > 0 ? epub->getCumulativeSpineItemSize(currentSpineIndex - 1) : 0;
-    const size_t currentBytes = epub->getCumulativeSpineItemSize(currentSpineIndex);
-    const size_t spineBytes = currentBytes > previousBytes ? currentBytes - previousBytes : 0;
-    if (bookBytes > 0 && spineBytes > 0 && pageCount > 0) {
-      totalBookPages = std::max(
-          1, static_cast<int>((static_cast<double>(bookBytes) * pageCount / static_cast<double>(spineBytes)) + 0.5));
+    if (vesperEstimateViewportWidth != buildViewportWidth || vesperEstimateViewportHeight != buildViewportHeight) {
+      vesperEstimatedBookPages = 0;
+      vesperEstimateViewportWidth = buildViewportWidth;
+      vesperEstimateViewportHeight = buildViewportHeight;
     }
+
+    if (vesperEstimatedBookPages <= 0) {
+      int estimate = std::max(1, static_cast<int>(pageCount));
+      const size_t bookBytes = epub->getBookSize();
+      const size_t previousBytes =
+          currentSpineIndex > 0 ? epub->getCumulativeSpineItemSize(currentSpineIndex - 1) : 0;
+      const size_t currentBytes = epub->getCumulativeSpineItemSize(currentSpineIndex);
+      const size_t spineBytes = currentBytes > previousBytes ? currentBytes - previousBytes : 0;
+      if (bookBytes > 0 && spineBytes > 0 && pageCount > 0) {
+        estimate = std::max(
+            1, static_cast<int>((static_cast<double>(bookBytes) * pageCount / static_cast<double>(spineBytes)) + 0.5));
+      }
+      vesperEstimatedBookPages = estimate;
+    }
+
+    const int totalBookPages = vesperEstimatedBookPages;
     const int percent = std::clamp(static_cast<int>(bookProgress + 0.5f), 0, 100);
     const int wholePage =
         std::clamp(static_cast<int>((static_cast<double>(percent) / 100.0) * totalBookPages + 0.5), 1, totalBookPages);
@@ -2437,6 +2452,9 @@ void EpubReaderActivity::applyReaderTextSettings() {
     cachedChapterTotalPageCount = section->pageCount;
     nextPageNumber = section->currentPage;
   }
+  vesperEstimatedBookPages = 0;
+  vesperEstimateViewportWidth = 0;
+  vesperEstimateViewportHeight = 0;
   section.reset();  // force re-pagination with the new settings
 }
 
