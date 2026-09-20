@@ -852,23 +852,28 @@ void EpubReaderActivity::onReaderMenuConfirm(EpubReaderMenuActivity::MenuAction 
       break;
     }
     case EpubReaderMenuActivity::MenuAction::IMMERSIVE_OPTIONS: {
-      startActivityForResult(std::make_unique<ImmersiveOptionsActivity>(renderer, mappedInput),
-                             [this](const ActivityResult&) {
-                               // Persistent-footer changes alter the EPUB
-                               // viewport. Preserve the content anchor, drop the
-                               // old pagination and return to the reader menu.
-                               {
-                                 RenderLock lock;
-                                 if (section) {
-                                   rememberCurrentContentOffset();
-                                   cachedSpineIndex = currentSpineIndex;
-                                   cachedChapterTotalPageCount = section->pageCount;
-                                   nextPageNumber = section->currentPage;
-                                 }
-                                 section.reset();
-                               }
-                               openReaderMenu();
-                             });
+      const int oldFooterReserve =
+          VesperReaderFooter::hasContent() && SETTINGS.immersiveMode == 0 ? VesperReaderFooter::height() : 0;
+      startActivityForResult(
+          std::make_unique<ImmersiveOptionsActivity>(renderer, mappedInput),
+          [this, oldFooterReserve](const ActivityResult&) {
+            const int newFooterReserve =
+                VesperReaderFooter::hasContent() && SETTINGS.immersiveMode == 0 ? VesperReaderFooter::height() : 0;
+            if (oldFooterReserve != newFooterReserve) {
+              // Only a persistent-lane change needs pagination. Toggling pages,
+              // percentage or battery within an already-present footer is
+              // chrome-only and should not make the book jump.
+              RenderLock lock;
+              if (section) {
+                rememberCurrentContentOffset();
+                cachedSpineIndex = currentSpineIndex;
+                cachedChapterTotalPageCount = section->pageCount;
+                nextPageNumber = section->currentPage;
+              }
+              section.reset();
+            }
+            openReaderMenu();
+          });
       break;
     }
     case EpubReaderMenuActivity::MenuAction::NIGHT_MODE:
@@ -1187,14 +1192,20 @@ void EpubReaderActivity::renderBook() {
   orientedMarginLeft += SETTINGS.screenMargin;
   orientedMarginRight += SETTINGS.screenMargin;
 
-  const bool vesperFooter =
-      SETTINGS.uiTheme == CrossPointSettings::UI_THEME::VESPERUI && VesperReaderFooter::hasContent();
-  const uint8_t statusBarHeight = vesperFooter && SETTINGS.immersiveMode == 0
-                                      ? static_cast<uint8_t>(VesperReaderFooter::height())
-                                      : UITheme::getInstance().getStatusBarHeight();
+  const bool vesperTheme = SETTINGS.uiTheme == CrossPointSettings::UI_THEME::VESPERUI;
+  const bool vesperFooter = vesperTheme && VesperReaderFooter::hasContent();
+  const uint8_t statusBarHeight =
+      vesperTheme ? (vesperFooter && SETTINGS.immersiveMode == 0 ? static_cast<uint8_t>(VesperReaderFooter::height())
+                                                                 : 0)
+                  : UITheme::getInstance().getStatusBarHeight();
 
-  if (!vesperFooter && automaticPageTurnActive &&
-      (statusBarHeight == 0 || statusBarHeight == UITheme::getInstance().getProgressBarHeight())) {
+  if (vesperTheme) {
+    // VesperUI owns this lane completely. Immersion Mode, or disabling every
+    // footer component, must return the pixels to the book rather than inherit
+    // a hidden legacy CrossPoint status-bar reservation.
+    orientedMarginBottom += std::max(SETTINGS.screenMargin, statusBarHeight);
+  } else if (automaticPageTurnActive &&
+             (statusBarHeight == 0 || statusBarHeight == UITheme::getInstance().getProgressBarHeight())) {
     orientedMarginBottom +=
         std::max(SETTINGS.screenMargin,
                  static_cast<uint8_t>(statusBarHeight + UITheme::getInstance().getMetrics().statusBarVerticalMargin));
