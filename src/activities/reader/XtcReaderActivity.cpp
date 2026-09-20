@@ -23,6 +23,7 @@ constexpr size_t PAGE_TURN_RATE_COUNT = sizeof(PAGE_TURN_RATES) / sizeof(PAGE_TU
 #include "XtcReaderMenuActivity.h"
 #include "activities/util/KeyboardEntryActivity.h"
 #include "components/UITheme.h"
+#include "components/VesperReaderFooter.h"
 #include "fontIds.h"
 
 bool XtcReaderActivity::loadBook() {
@@ -178,39 +179,23 @@ void XtcReaderActivity::toggleAutoPageTurn(const uint8_t option) {
   automaticPageTurnActive = true;
 }
 
-void XtcReaderActivity::applyDisplayOrientation() { renderer.setOrientation(GfxRenderer::Orientation::Portrait); }
+void XtcReaderActivity::applyDisplayOrientation() { ReaderUtils::applyOrientation(renderer, SETTINGS.orientation); }
 
-void XtcReaderActivity::applyInitialOrientation() { renderer.setOrientation(GfxRenderer::Orientation::Portrait); }
+void XtcReaderActivity::applyInitialOrientation() { ReaderUtils::applyOrientation(renderer, SETTINGS.orientation); }
 
 GfxRenderer::Orientation XtcReaderActivity::tapInputOrientation() const {
-  switch (SETTINGS.xtcTapProfile) {
-    case CrossPointSettings::XTC_TAP_LANDSCAPE_CW:
-      return GfxRenderer::Orientation::LandscapeClockwise;
-    case CrossPointSettings::XTC_TAP_INVERTED:
-      return GfxRenderer::Orientation::PortraitInverted;
-    case CrossPointSettings::XTC_TAP_LANDSCAPE_CCW:
-      return GfxRenderer::Orientation::LandscapeCounterClockwise;
-    case CrossPointSettings::XTC_TAP_PORTRAIT:
-    default:
-      return GfxRenderer::Orientation::Portrait;
-  }
+  // Visual orientation is authoritative. The XTC tap-profile setting survives
+  // only as the user's normal/inverted semantic preference in
+  // detectTouchPageTurn(); it no longer defines a second coordinate system.
+  return renderer.getOrientation();
 }
 
-GfxRenderer::Orientation XtcReaderActivity::statusBarOrientation() const {
-  // XTC page pixels stay in the file's portrait framebuffer. A user holding
-  // that framebuffer sideways sees chrome in the opposite logical rotation
-  // from the touch transform, so mirror the two landscape profiles here.
-  switch (SETTINGS.xtcTapProfile) {
-    case CrossPointSettings::XTC_TAP_LANDSCAPE_CW:
-      return GfxRenderer::Orientation::LandscapeCounterClockwise;
-    case CrossPointSettings::XTC_TAP_LANDSCAPE_CCW:
-      return GfxRenderer::Orientation::LandscapeClockwise;
-    case CrossPointSettings::XTC_TAP_INVERTED:
-      return GfxRenderer::Orientation::PortraitInverted;
-    case CrossPointSettings::XTC_TAP_PORTRAIT:
-    default:
-      return GfxRenderer::Orientation::Portrait;
-  }
+void XtcReaderActivity::drawVesperFooter() const {
+  if (!immersiveFooterVisible() || !xtc) return;
+  const int total = static_cast<int>(xtc->getPageCount());
+  const int current = std::min(static_cast<int>(currentPage) + 1, std::max(1, total));
+  const int percent = total > 0 ? std::clamp((current * 100 + total / 2) / total, 0, 100) : 0;
+  VesperReaderFooter::draw(renderer, {current, total, percent}, true);
 }
 
 void XtcReaderActivity::renderBook() {
@@ -260,12 +245,10 @@ void XtcReaderActivity::renderStatusBarOverlay(GfxRenderer& renderer, const Stat
   }
 
   const GfxRenderer::Orientation pageOrientation = renderer.getOrientation();
-  const GfxRenderer::Orientation overlayOrientation = statusBarOrientation();
-  if (pageOrientation != overlayOrientation) renderer.setOrientation(overlayOrientation);
+  const GfxRenderer::Orientation overlayOrientation = pageOrientation;
 
   const int statusBarHeight = UITheme::getInstance().getStatusBarHeight();
   if (statusBarHeight <= 0) {
-    if (pageOrientation != overlayOrientation) renderer.setOrientation(pageOrientation);
     return;
   }
 
@@ -297,13 +280,10 @@ void XtcReaderActivity::renderStatusBarOverlay(GfxRenderer& renderer, const Stat
   const auto pageInfo = getStatusBarInfo();
   GUI.drawStatusBar(renderer, progress, pageInfo.currentPage, pageInfo.pageCount, pageInfo.title, paddingBottom);
 
-  if (pageOrientation != overlayOrientation) renderer.setOrientation(pageOrientation);
 }
 
 void XtcReaderActivity::renderPage() {
-  // Never inherit a transient menu/interface transform. XTC page data is
-  // authored against the portrait framebuffer; only its status chrome rotates.
-  renderer.setOrientation(GfxRenderer::Orientation::Portrait);
+  ReaderUtils::applyOrientation(renderer, SETTINGS.orientation);
 
   const uint16_t pageWidth = xtc->getPageWidth();
   const uint16_t pageHeight = xtc->getPageHeight();
@@ -320,56 +300,82 @@ void XtcReaderActivity::renderPage() {
   if (!pageBuffer) {
     LOG_ERR("XTR", "Failed to allocate page buffer (%lu bytes)", pageBufferSize);
     renderer.clearScreen();
-    renderer.drawCenteredText(UI_12_FONT_ID, 300, tr(STR_MEMORY_ERROR), true, EpdFontFamily::BOLD);
+    renderer.drawCenteredText(UI_12_FONT_ID, renderer.getScreenHeight() / 2, tr(STR_MEMORY_ERROR), true,
+                              EpdFontFamily::BOLD);
     renderer.displayBuffer();
     return;
   }
 
-  size_t bytesRead = xtc->loadPage(currentPage, pageBuffer, pageBufferSize);
+  const size_t bytesRead = xtc->loadPage(currentPage, pageBuffer, pageBufferSize);
   if (bytesRead == 0) {
     LOG_ERR("XTR", "Failed to load page %lu: bufferSize=%lu bitDepth=%u error=%s", currentPage, pageBufferSize,
             bitDepth, xtc::errorToString(xtc->getLastError()));
     free(pageBuffer);
     renderer.clearScreen();
-    renderer.drawCenteredText(UI_12_FONT_ID, 300, tr(STR_PAGE_LOAD_ERROR), true, EpdFontFamily::BOLD);
+    renderer.drawCenteredText(UI_12_FONT_ID, renderer.getScreenHeight() / 2, tr(STR_PAGE_LOAD_ERROR), true,
+                              EpdFontFamily::BOLD);
     renderer.displayBuffer();
     return;
   }
 
-  renderer.clearScreen();
+  const int screenW = renderer.getScreenWidth();
+  const int screenH = renderer.getScreenHeight();
+  const float scale = std::min(static_cast<float>(screenW) / std::max<uint16_t>(1, pageWidth),
+                               static_cast<float>(screenH) / std::max<uint16_t>(1, pageHeight));
+  const int fitW = std::max(1, std::min(screenW, static_cast<int>(pageWidth * scale + 0.5f)));
+  const int fitH = std::max(1, std::min(screenH, static_cast<int>(pageHeight * scale + 0.5f)));
+  const int offsetX = (screenW - fitW) / 2;
+  const int offsetY = (screenH - fitH) / 2;
 
-  const uint16_t maxSrcY = pageHeight;
+  const size_t monoRowBytes = (pageWidth + 7) / 8;
+  const size_t grayColBytes = (pageHeight + 7) / 8;
+  const size_t grayPlaneSize = static_cast<size_t>(pageWidth) * grayColBytes;
+  const uint8_t* plane1 = pageBuffer;
+  const uint8_t* plane2 = bitDepth == 2 ? pageBuffer + grayPlaneSize : nullptr;
 
-  if (bitDepth == 2) {
-    const size_t planeSize = static_cast<size_t>(pageWidth) * ((static_cast<size_t>(pageHeight) + 7) / 8);
-    const uint8_t* plane1 = pageBuffer;
-    const uint8_t* plane2 = pageBuffer + planeSize;
-    const size_t colBytes = (pageHeight + 7) / 8;
-
-    auto getPixelValue = [&](uint16_t x, uint16_t y) -> uint8_t {
+  const auto sourceValue = [&](const uint16_t x, const uint16_t y) -> uint8_t {
+    if (bitDepth == 2) {
       const size_t colIndex = pageWidth - 1 - x;
-      const size_t byteInCol = y / 8;
-      const size_t bitInByte = 7 - (y % 8);
-      const size_t byteOffset = colIndex * colBytes + byteInCol;
-      const uint8_t bit1 = (plane1[byteOffset] >> bitInByte) & 1;
-      const uint8_t bit2 = (plane2[byteOffset] >> bitInByte) & 1;
-      return (bit1 << 1) | bit2;
-    };
+      const size_t byteOffset = colIndex * grayColBytes + y / 8;
+      const int bit = 7 - (y % 8);
+      return static_cast<uint8_t>((((plane1[byteOffset] >> bit) & 1) << 1) | ((plane2[byteOffset] >> bit) & 1));
+    }
+    const size_t byteOffset = static_cast<size_t>(y) * monoRowBytes + x / 8;
+    return ((pageBuffer[byteOffset] >> (7 - (x % 8))) & 1) ? 0 : 3;
+  };
 
-    for (uint16_t y = 0; y < pageHeight; y++) {
-      for (uint16_t x = 0; x < pageWidth; x++) {
-        if (getPixelValue(x, y) >= 1) {
-          renderer.drawPixel(x, y, true);
-        }
+  const auto renderLevel = [&](const int pass) {
+    for (int dy = 0; dy < fitH; ++dy) {
+      const uint16_t sy = static_cast<uint16_t>(std::min<int>(pageHeight - 1, dy * pageHeight / fitH));
+      for (int dx = 0; dx < fitW; ++dx) {
+        const uint16_t sx = static_cast<uint16_t>(std::min<int>(pageWidth - 1, dx * pageWidth / fitW));
+        const uint8_t value = sourceValue(sx, sy);
+        bool pixel = false;
+        if (pass == 0)
+          pixel = value >= 1;
+        else if (pass == 1)
+          pixel = value == 1;
+        else
+          pixel = value == 1 || value == 2;
+        if (pixel) renderer.drawPixel(offsetX + dx, offsetY + dy, pass == 0);
       }
     }
+  };
 
+  renderer.clearScreen();
+  renderLevel(0);
+
+  const bool vesper = SETTINGS.uiTheme == CrossPointSettings::UI_THEME::VESPERUI;
+  if (vesper) {
+    drawVesperFooter();
+  } else if (SETTINGS.statusBarSpec().xtcMode == CrossPointSettings::XTC_STATUS_BAR_MODE::XTC_STATUS_BAR_TOP) {
+    renderStatusBarOverlay(renderer, StatusBarOverlayPosition::Top);
+  } else {
+    renderStatusBarOverlay(renderer, StatusBarOverlayPosition::Bottom);
+  }
+
+  if (bitDepth == 2) {
     if (pagesUntilFullRefresh <= 1) {
-      // Periodic ghost cleanup: scrub via the normal path, then run the
-      // settle flavor of the grayscale base pass (DTM planes are equal after
-      // the display sync, so only the gentle reinforcement cells fire).
-      // Combined-base panels (Paper Mono) instead defer the base so the gray
-      // planes below join it in one waveform.
       if (renderer.grayscaleCapabilities().base == HalDisplay::GrayscaleBase::Combined) {
         renderer.displayGrayscaleBase(HalDisplay::HALF_REFRESH);
       } else {
@@ -383,72 +389,28 @@ void XtcReaderActivity::renderPage() {
     }
 
     renderer.clearScreen(0x00);
-    for (uint16_t y = 0; y < pageHeight; y++) {
-      for (uint16_t x = 0; x < pageWidth; x++) {
-        if (getPixelValue(x, y) == 1) {
-          renderer.drawPixel(x, y, false);
-        }
-      }
-    }
+    renderLevel(1);
+    if (vesper) drawVesperFooter();
     renderer.copyGrayscaleLsbBuffers();
 
     renderer.clearScreen(0x00);
-    for (uint16_t y = 0; y < pageHeight; y++) {
-      for (uint16_t x = 0; x < pageWidth; x++) {
-        const uint8_t pv = getPixelValue(x, y);
-        if (pv == 1 || pv == 2) {
-          renderer.drawPixel(x, y, false);
-        }
-      }
-    }
+    renderLevel(2);
+    if (vesper) drawVesperFooter();
     renderer.copyGrayscaleMsbBuffers();
 
     renderer.displayGrayBuffer();
 
     renderer.clearScreen();
-    for (uint16_t y = 0; y < pageHeight; y++) {
-      for (uint16_t x = 0; x < pageWidth; x++) {
-        if (getPixelValue(x, y) >= 1) {
-          renderer.drawPixel(x, y, true);
-        }
-      }
-    }
-
+    renderLevel(0);
+    if (vesper) drawVesperFooter();
     renderer.cleanupGrayscaleWithFrameBuffer();
-
-    free(pageBuffer);
-
-    LOG_DBG("XTR", "Rendered page %lu/%lu (2-bit grayscale)", currentPage + 1, xtc->getPageCount());
-    return;
   } else {
-    const size_t srcRowBytes = (pageWidth + 7) / 8;
-
-    for (uint16_t srcY = 0; srcY < maxSrcY; srcY++) {
-      const size_t srcRowStart = srcY * srcRowBytes;
-
-      for (uint16_t srcX = 0; srcX < pageWidth; srcX++) {
-        const size_t srcByte = srcRowStart + srcX / 8;
-        const size_t srcBit = 7 - (srcX % 8);
-        const bool isBlack = !((pageBuffer[srcByte] >> srcBit) & 1);
-
-        if (isBlack) {
-          renderer.drawPixel(srcX, srcY, true);
-        }
-      }
-    }
+    ReaderUtils::displayWithRefreshCycle(renderer, pagesUntilFullRefresh);
   }
 
   free(pageBuffer);
-
-  if (SETTINGS.statusBarSpec().xtcMode == CrossPointSettings::XTC_STATUS_BAR_MODE::XTC_STATUS_BAR_TOP) {
-    renderStatusBarOverlay(renderer, StatusBarOverlayPosition::Top);
-  } else {
-    renderStatusBarOverlay(renderer, StatusBarOverlayPosition::Bottom);
-  }
-
-  ReaderUtils::displayWithRefreshCycle(renderer, pagesUntilFullRefresh);
-
-  LOG_DBG("XTR", "Rendered page %lu/%lu (%u-bit)", currentPage + 1, xtc->getPageCount(), bitDepth);
+  LOG_DBG("XTR", "Rendered page %lu/%lu (%u-bit, %dx%d fit)", currentPage + 1, xtc->getPageCount(), bitDepth, fitW,
+          fitH);
 }
 
 bool XtcReaderActivity::pageTurn(bool isForward) {

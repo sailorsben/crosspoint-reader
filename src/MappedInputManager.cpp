@@ -307,6 +307,8 @@ bool MappedInputManager::wasMenuGesture() const { return wasTopEdgeDownSwipe(); 
 
 bool MappedInputManager::wasReaderMenuSwipeUp() const { return gpio.hasHomeKey() && wasBottomEdgeUpSwipe(); }
 
+bool MappedInputManager::wasImmersiveFooterSwipeUp() const { return wasBottomEdgeUpSwipe(); }
+
 bool MappedInputManager::wasHomeGesture() const {
   return gpio.hasHomeKey() ? homeAction == HomeButtonAction::Home : wasBottomEdgeUpSwipe();
 }

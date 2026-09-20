@@ -46,6 +46,29 @@ void ReaderActivity::applyInitialOrientation() { ReaderUtils::applyOrientation(r
 
 void ReaderActivity::disableFastInitialRefresh() { pagesUntilFullRefresh = 0; }
 
+bool ReaderActivity::immersiveFooterVisible() const {
+  if (SETTINGS.uiTheme != CrossPointSettings::UI_THEME::VESPERUI) return false;
+  const bool hasAny = SETTINGS.immersiveShowPages || SETTINGS.immersiveShowProgress ||
+                      SETTINGS.immersiveShowPercentage || SETTINGS.immersiveShowBattery;
+  if (!hasAny) return false;
+  return SETTINGS.immersiveMode == 0 || immersiveFooterRevealed;
+}
+
+bool ReaderActivity::handleImmersiveFooterGesture() {
+  if (SETTINGS.uiTheme != CrossPointSettings::UI_THEME::VESPERUI || SETTINGS.immersiveMode == 0) return false;
+  if (!(SETTINGS.immersiveShowPages || SETTINGS.immersiveShowProgress || SETTINGS.immersiveShowPercentage ||
+        SETTINGS.immersiveShowBattery))
+    return false;
+  if (!mappedInput.wasImmersiveFooterSwipeUp()) return false;
+  immersiveFooterRevealed = true;
+  requestUpdate();
+  return true;
+}
+
+void ReaderActivity::hideImmersiveFooterAfterTurn() {
+  if (SETTINGS.immersiveMode != 0) immersiveFooterRevealed = false;
+}
+
 void ReaderActivity::applyDisplayOrientation() {
   // Restore the reader's persisted screen transform without touching format-
   // specific layout bookkeeping (EPUB uses appliedOrientation to decide when
@@ -149,6 +172,7 @@ bool ReaderActivity::handleEndOfBookPageTurn(const bool prevTriggered, const boo
 void ReaderActivity::loop() {
   clearEndOfBookOptionsIfNeeded();
   if (handleEndOfBookMenu()) return;
+  if (handleImmersiveFooterGesture()) return;
   if (handleFormatInput()) return;
   if (handleBackNavigation()) return;
 
@@ -176,6 +200,7 @@ void ReaderActivity::loop() {
       pageTurn(true);
     }
   }
+  hideImmersiveFooterAfterTurn();
   requestUpdate();
 }
 

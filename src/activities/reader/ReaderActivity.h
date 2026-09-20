@@ -13,6 +13,7 @@ class ReaderActivity : public Activity {
   std::string bookPath;
   int pagesUntilFullRefresh = 0;
   bool forcedRefreshPending = false;
+  bool immersiveFooterRevealed = false;
 
   std::unique_ptr<EndOfBookOptions> endOfBookOptions;
   std::atomic<bool> endOfBookOptionsReady{false};
@@ -43,6 +44,9 @@ class ReaderActivity : public Activity {
   bool handleEndOfBookPageTurn(bool prevTriggered, bool nextTriggered);
   void clearEndOfBookOptionsIfNeeded();
   void disableFastInitialRefresh();
+  bool handleImmersiveFooterGesture();
+  void hideImmersiveFooterAfterTurn();
+  bool immersiveFooterVisible() const;
 
  public:
   ~ReaderActivity() override = default;

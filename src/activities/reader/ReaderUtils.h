@@ -134,7 +134,9 @@ inline TouchPageTurn detectTouchPageTurn(const GfxRenderer& renderer, const Mapp
 inline bool isTouchMenuTap(const GfxRenderer& renderer, const MappedInputManager& input,
                            const GfxRenderer::Orientation tapOrientation) {
   if (!input.hasTouch()) return false;
-  if (SETTINGS.showReaderMenu != CrossPointSettings::READER_MENU_TAP) return false;
+  if (SETTINGS.uiTheme != CrossPointSettings::UI_THEME::VESPERUI &&
+      SETTINGS.showReaderMenu != CrossPointSettings::READER_MENU_TAP)
+    return false;
   int x = 0;
   int y = 0;
   if (!input.wasScreenTappedForOrientation(x, y, tapOrientation)) return false;
@@ -159,7 +161,8 @@ inline bool isTouchMenuGesture(const GfxRenderer& renderer, const MappedInputMan
   if (input.wasMenuGesture()) return true;
   // Bottom-edge up-swipe variant: only selectable on home-key boards, where
   // Home is the capacitive key and the bottom edge is otherwise unused.
-  if (SETTINGS.showReaderMenu == CrossPointSettings::READER_MENU_SWIPE_UP && input.wasReaderMenuSwipeUp()) {
+  if (SETTINGS.uiTheme != CrossPointSettings::UI_THEME::VESPERUI &&
+      SETTINGS.showReaderMenu == CrossPointSettings::READER_MENU_SWIPE_UP && input.wasReaderMenuSwipeUp()) {
     return true;
   }
   return isTouchMenuTap(renderer, input, tapOrientation);

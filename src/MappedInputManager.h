@@ -105,6 +105,10 @@ class MappedInputManager {
   // key and the bottom edge is free; elsewhere the same swipe is the Home
   // gesture and this returns false.
   bool wasReaderMenuSwipeUp() const;
+  // Bottom-edge up swipe in the current logical orientation. Vesper reader
+  // immersion uses this directly; unlike wasReaderMenuSwipeUp(), it is not
+  // gated by the reader-menu preference.
+  bool wasImmersiveFooterSwipeUp() const;
   // Top-edge down-swipe opens the light panel when the active board actually
   // has a frontlight. ActivityManager consumes it before activity input.
   bool wasLightPanelGesture() const;
