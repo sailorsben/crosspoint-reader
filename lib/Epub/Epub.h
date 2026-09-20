@@ -61,6 +61,11 @@ class Epub {
   bool generateThumbBmp(int height) const;
   std::string getVesperThumbBmpPath(int width, int height) const;
   bool generateVesperThumbBmp(int width, int height) const;
+  // Cover-first Vesper Library uses an exact target-sized 1-bit Atkinson
+  // thumbnail so windowed scrolling stays fast without crushing a 2-bit BMP
+  // through the B/W renderer.
+  std::string getVesperLibraryThumbBmpPath(int width, int height) const;
+  bool generateVesperLibraryThumbBmp(int width, int height) const;
   uint8_t* readItemContentsToBytes(const std::string& itemHref, size_t* size = nullptr,
                                    bool trailingNullByte = false) const;
   bool readItemContentsToStream(const std::string& itemHref, Print& out, size_t chunkSize,

@@ -920,6 +920,60 @@ bool Epub::generateVesperThumbBmp(const int width, const int height) const {
   return success;
 }
 
+std::string Epub::getVesperLibraryThumbBmpPath(const int width, const int height) const {
+  return cachePath + "/thumb_vuilib1_" + std::to_string(width) + "x" + std::to_string(height) + ".bmp";
+}
+
+bool Epub::generateVesperLibraryThumbBmp(const int width, const int height) const {
+  if (width <= 0 || height <= 0) return false;
+  const std::string outputPath = getVesperLibraryThumbBmpPath(width, height);
+  if (Storage.exists(outputPath.c_str())) return true;
+
+  if (!bookMetadataCache || !bookMetadataCache->isLoaded()) {
+    LOG_ERR("EBP", "Cannot generate VesperUI Library thumb, cache not loaded");
+    return false;
+  }
+
+  const auto coverImageHref = bookMetadataCache->coreMetadata.coverItemHref;
+  if (coverImageHref.empty()) return false;
+
+  const bool isJpeg = FsHelpers::hasJpgExtension(coverImageHref);
+  const bool isPng = FsHelpers::hasPngExtension(coverImageHref);
+  if (!isJpeg && !isPng) return false;
+
+  const std::string tempPath = getCachePath() + (isJpeg ? "/.vuilib-cover.jpg" : "/.vuilib-cover.png");
+  HalFile source;
+  if (!Storage.openFileForWrite("EBP", tempPath, source)) return false;
+  const bool extracted = readItemContentsToStream(coverImageHref, source, 4096);
+  source.close();
+  if (!extracted || !Storage.openFileForRead("EBP", tempPath, source)) {
+    Storage.remove(tempPath.c_str());
+    return false;
+  }
+
+  HalFile thumb;
+  if (!Storage.openFileForWrite("EBP", outputPath, thumb)) {
+    source.close();
+    Storage.remove(tempPath.c_str());
+    return false;
+  }
+
+  // The converter scales before dithering and uses Atkinson error diffusion.
+  // crop=true in the 1-bit helper means the result always fills the cover slot;
+  // drawBookCover() performs the final center crop when one dimension exceeds
+  // the exact target.
+  const bool success = isJpeg ? JpegToBmpConverter::jpegFileTo1BitBmpStreamWithSize(source, thumb, width, height)
+                              : PngToBmpConverter::pngFileTo1BitBmpStreamWithSize(source, thumb, width, height);
+  source.close();
+  thumb.close();
+  Storage.remove(tempPath.c_str());
+
+  if (!success) Storage.remove(outputPath.c_str());
+  LOG_DBG("EBP", "Generated VesperUI Library thumb %dx%d: %s", width, height, success ? "yes" : "no");
+  return success;
+}
+
+
 uint8_t* Epub::readItemContentsToBytes(const std::string& itemHref, size_t* size, const bool trailingNullByte) const {
   if (itemHref.empty()) {
     LOG_DBG("EBP", "Failed to read item, empty href");

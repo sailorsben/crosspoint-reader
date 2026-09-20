@@ -69,6 +69,8 @@ class Xtc {
   bool generateThumbBmp(int height) const;
   std::string getVesperThumbBmpPath(int width, int height) const;
   bool generateVesperThumbBmp(int width, int height) const;
+  std::string getVesperLibraryThumbBmpPath(int width, int height) const;
+  bool generateVesperLibraryThumbBmp(int width, int height) const;
 
   // Page access
   uint32_t getPageCount() const;

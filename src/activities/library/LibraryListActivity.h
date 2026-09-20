@@ -187,6 +187,8 @@ class LibraryListActivity final : public UiTabListActivity {
   void renderVesperSearchPill();
   void renderVesperKeyboard();
   void renderVesperSortOverlay();
+  void vesperCoverSize(int& width, int& height) const;
+  void prepareVesperVisibleCovers();
   void drawVesperCoverEntry(int entry, int x, int y, int width, int height, int titleHeight, bool selected);
   bool pathForEntry(int entry, std::string& path);
   void openVesperEntry(int entry);

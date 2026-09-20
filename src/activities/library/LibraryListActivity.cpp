@@ -119,6 +119,7 @@ void LibraryListActivity::onEnter() {
     vesperKeyboardVisible = false;
     vesperSortOpen = false;
     vesperScrollOnlyRefresh = false;
+    prepareVesperVisibleCovers();
   }
 
   // Entered while Confirm was still held (typical when launched from the home
@@ -657,6 +658,7 @@ void LibraryListActivity::openVesperEntry(const int entry) {
 }
 
 void LibraryListActivity::setVesperSort(const library::SortOrder order) {
+  RenderLock lock(*this);
   sortOrder = order;
   if (order == library::SortOrder::TitleAsc || order == library::SortOrder::TitleDesc) {
     activeTabIndex = TITLE_TAB;
@@ -670,6 +672,7 @@ void LibraryListActivity::setVesperSort(const library::SortOrder order) {
   vesperOffset = 0;
   vesperSelected = 0;
   vesperSortOpen = false;
+  prepareVesperVisibleCovers();
   requestUpdate(true);
 }
 
@@ -722,6 +725,10 @@ void LibraryListActivity::loopVesper() {
       requestUpdate();
     } else if (vesperKeyboardVisible) {
       vesperKeyboardVisible = false;
+      {
+        RenderLock lock(*this);
+        prepareVesperVisibleCovers();
+      }
       requestUpdate();
     } else if (vesperSearchActive) {
       closeVesperSearch(true);
@@ -742,6 +749,10 @@ void LibraryListActivity::loopVesper() {
       const int step = landscape ? 1 : 2;
       vesperOffset = std::min(std::max(0, count - 1), vesperOffset + step);
       vesperSelected = vesperOffset;
+      {
+        RenderLock lock(*this);
+        prepareVesperVisibleCovers();
+      }
       vesperScrollOnlyRefresh = true;
       requestUpdate(true);
     }
@@ -752,6 +763,10 @@ void LibraryListActivity::loopVesper() {
       const int step = landscape ? 1 : 2;
       vesperOffset = std::max(0, vesperOffset - step);
       vesperSelected = vesperOffset;
+      {
+        RenderLock lock(*this);
+        prepareVesperVisibleCovers();
+      }
       vesperScrollOnlyRefresh = true;
       requestUpdate(true);
     }
@@ -765,6 +780,10 @@ void LibraryListActivity::loopVesper() {
       const int delta = swipe == MappedInputManager::SwipeDir::Left ? 1 : -1;
       vesperOffset = std::clamp(vesperOffset + delta, 0, std::max(0, count - 1));
       vesperSelected = vesperOffset;
+      {
+        RenderLock lock(*this);
+        prepareVesperVisibleCovers();
+      }
       vesperScrollOnlyRefresh = true;
       requestUpdate(true);
     }
@@ -776,6 +795,10 @@ void LibraryListActivity::loopVesper() {
       vesperOffset = std::clamp(vesperOffset + delta, 0, std::max(0, count - 1));
       vesperOffset &= ~1;
       vesperSelected = vesperOffset;
+      {
+        RenderLock lock(*this);
+        prepareVesperVisibleCovers();
+      }
       vesperScrollOnlyRefresh = true;
       requestUpdate(true);
     }
@@ -873,6 +896,10 @@ void LibraryListActivity::loopVesper() {
           updateVesperSearch(next);
         } else {
           vesperKeyboardVisible = false;
+          {
+            RenderLock lock(*this);
+            prepareVesperVisibleCovers();
+          }
           requestUpdate();
         }
         return;
@@ -933,6 +960,89 @@ void LibraryListActivity::loop() {
   UiTabListActivity::loop();
 }
 
+void LibraryListActivity::vesperCoverSize(int& width, int& height) const {
+  const int sw = renderer.getScreenWidth();
+  const int sh = renderer.getScreenHeight();
+  const bool landscape = sw > sh;
+  const auto& metrics = UITheme::getInstance().getMetrics();
+  const int headerBottom = metrics.topPadding + metrics.headerHeight;
+  const int pillReserve = vesperSearchActive ? 50 : 0;
+  const int contentTop = headerBottom + 8 + pillReserve;
+  const int contentBottom = sh - (landscape ? 34 : 12);
+
+  if (landscape) {
+    constexpr int titleH = 42;
+    height = std::max(120, std::min(315, contentBottom - contentTop - titleH));
+    width = std::max(90, std::min(220, height * 2 / 3));
+    return;
+  }
+
+  constexpr int side = 22;
+  constexpr int gapX = 18;
+  const int colW = (sw - side * 2 - gapX) / 2;
+  width = std::min(184, colW - 8);
+  height = std::min(270, width * 3 / 2);
+}
+
+void LibraryListActivity::prepareVesperVisibleCovers() {
+  if (!usesVesperLibrary() || !index.isOpen()) return;
+
+  int coverW = 0;
+  int coverH = 0;
+  vesperCoverSize(coverW, coverH);
+  if (coverW <= 0 || coverH <= 0) return;
+
+  const int count = listCount();
+  const int visible = std::min(vesperVisibleCount(), std::max(0, count - vesperOffset));
+  if (visible <= 0) return;
+
+  struct Candidate {
+    std::string path;
+    bool missing = false;
+  };
+  std::vector<Candidate> candidates;
+  candidates.reserve(static_cast<size_t>(visible));
+  bool anyMissing = false;
+
+  for (int slot = 0; slot < visible; ++slot) {
+    std::string path;
+    if (!pathForEntry(vesperOffset + slot, path)) continue;
+
+    Candidate candidate;
+    candidate.path = std::move(path);
+    if (FsHelpers::hasEpubExtension(candidate.path)) {
+      Epub epub(candidate.path, "/.crosspoint");
+      candidate.missing = !Storage.exists(epub.getVesperLibraryThumbBmpPath(coverW, coverH).c_str());
+    } else if (FsHelpers::hasXtcExtension(candidate.path)) {
+      Xtc xtc(candidate.path, "/.crosspoint");
+      candidate.missing = !Storage.exists(xtc.getVesperLibraryThumbBmpPath(coverW, coverH).c_str());
+    }
+    anyMissing |= candidate.missing;
+    candidates.push_back(std::move(candidate));
+  }
+
+  if (!anyMissing) return;
+
+  // LibraryIndexFile keeps a long-lived reader open. Release it while opening
+  // EPUB/XTC source data, then restore the same immutable index afterward.
+  index.close();
+  for (const Candidate& candidate : candidates) {
+    if (!candidate.missing) continue;
+
+    if (FsHelpers::hasEpubExtension(candidate.path)) {
+      Epub epub(candidate.path, "/.crosspoint");
+      if (epub.load(true, true)) epub.generateVesperLibraryThumbBmp(coverW, coverH);
+    } else if (FsHelpers::hasXtcExtension(candidate.path)) {
+      Xtc xtc(candidate.path, "/.crosspoint");
+      if (xtc.load()) xtc.generateVesperLibraryThumbBmp(coverW, coverH);
+    }
+  }
+
+  if (!index.open(library::libraryIndexPath())) {
+    LOG_ERR("LIB", "cannot reopen library index after Vesper cover generation");
+  }
+}
+
 void LibraryListActivity::drawVesperCoverEntry(const int entry, const int x, const int y, const int width,
                                                const int height, const int titleHeight, const bool selected) {
   if (entry < 0 || entry >= listCount()) return;
@@ -948,18 +1058,22 @@ void LibraryListActivity::drawVesperCoverEntry(const int entry, const int x, con
 
   if (FsHelpers::hasEpubExtension(path)) {
     Epub epub(path, "/.crosspoint");
-    const std::string exact = epub.getThumbBmpPath(height);
+    const std::string exact = epub.getVesperLibraryThumbBmpPath(width, height);
     if (Storage.exists(exact.c_str()))
       book.coverBmpPath = exact;
+    else if (Storage.exists(epub.getThumbBmpPath(height).c_str()))
+      book.coverBmpPath = epub.getThumbBmpPath(height);
     else if (Storage.exists(epub.getCoverBmpPath().c_str()))
       book.coverBmpPath = epub.getCoverBmpPath();
     else
       book.coverBmpPath = epub.getThumbBmpPath();
   } else if (FsHelpers::hasXtcExtension(path)) {
     Xtc xtc(path, "/.crosspoint");
-    const std::string exact = xtc.getThumbBmpPath(height);
+    const std::string exact = xtc.getVesperLibraryThumbBmpPath(width, height);
     if (Storage.exists(exact.c_str()))
       book.coverBmpPath = exact;
+    else if (Storage.exists(xtc.getThumbBmpPath(height).c_str()))
+      book.coverBmpPath = xtc.getThumbBmpPath(height);
     else if (Storage.exists(xtc.getCoverBmpPath().c_str()))
       book.coverBmpPath = xtc.getCoverBmpPath();
     else
