@@ -18,7 +18,7 @@ Rect ImmersiveOptionsActivity::modalRect() const {
   return Rect{(sw - width) / 2, (sh - height) / 2, width, height};
 }
 
-const char* ImmersiveOptionsActivity::rowLabel(const int row) const {
+const char* ImmersiveOptionsActivity::rowLabel(const int row) {
   switch (row) {
     case 0:
       return tr(STR_IMMERSION_MODE);

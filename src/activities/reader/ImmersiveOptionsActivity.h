@@ -19,7 +19,7 @@ class ImmersiveOptionsActivity final : public Activity {
   Rect modalRect() const;
   void toggleRow(int row);
   bool rowValue(int row) const;
-  const char* rowLabel(int row) const;
+  static const char* rowLabel(int row);
   void drawSwitch(const Rect& rect, bool on) const;
   void close();
 };

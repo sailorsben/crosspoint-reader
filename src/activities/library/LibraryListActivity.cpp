@@ -915,7 +915,6 @@ void LibraryListActivity::loopVesper() {
       const int col = slot % 2;
       const int row = slot / 2;
       const int cellX = side + col * (colW + gapX);
-      const int x = cellX + (colW - coverW) / 2;
       const int y = contentTop + row * rowH;
       if (tx >= cellX && tx < cellX + colW && ty >= y && ty < y + coverH + titleH) {
         vesperSelected = entry;

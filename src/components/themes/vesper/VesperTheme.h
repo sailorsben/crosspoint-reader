@@ -111,7 +111,7 @@ class VesperTheme final : public LyraTheme {
   // Draws only the cover pixels, respecting the current renderer mode. Home
   // reuses this for the LSB/MSB grayscale passes.
   static bool drawBookCover(const GfxRenderer& renderer, const RecentBook& book, Rect target);
-  static Rect drawHomeRecentPane(GfxRenderer& renderer, Rect band, const std::vector<RecentBook>& recentBooks,
+  static Rect drawHomeRecentPane(const GfxRenderer& renderer, Rect band, const std::vector<RecentBook>& recentBooks,
                                  int selectorIndex, int totalBooks, int offset, bool clearPane);
 
   void drawHeader(const GfxRenderer& renderer, Rect rect, const char* title,

@@ -15,8 +15,8 @@ class VesperReaderFooter {
   static bool hasContent();
   static bool persistentVisible();
   static int height();
-  static void draw(GfxRenderer& renderer, const Data& data, bool clearBackground = true);
+  static void draw(const GfxRenderer& renderer, const Data& data, bool clearBackground = true);
 
  private:
-  static void drawBattery(GfxRenderer& renderer, const Rect& rect);
+  static void drawBattery(const GfxRenderer& renderer, const Rect& rect);
 };

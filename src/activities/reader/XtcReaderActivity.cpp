@@ -254,9 +254,6 @@ void XtcReaderActivity::renderStatusBarOverlay(GfxRenderer& renderer, const Stat
     return;
   }
 
-  const GfxRenderer::Orientation pageOrientation = renderer.getOrientation();
-  const GfxRenderer::Orientation overlayOrientation = pageOrientation;
-
   const int statusBarHeight = UITheme::getInstance().getStatusBarHeight();
   if (statusBarHeight <= 0) {
     return;

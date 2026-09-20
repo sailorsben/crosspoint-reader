@@ -29,7 +29,7 @@ bool VesperReaderFooter::persistentVisible() { return hasContent() && SETTINGS.i
 
 int VesperReaderFooter::height() { return hasContent() ? kFooterHeight : 0; }
 
-void VesperReaderFooter::drawBattery(GfxRenderer& renderer, const Rect& rect) {
+void VesperReaderFooter::drawBattery(const GfxRenderer& renderer, const Rect& rect) {
   const int bodyW = rect.width - 3;
   renderer.drawRoundedRect(rect.x, rect.y, bodyW, rect.height, 1, 3, true);
   const int nubH = std::max(6, rect.height / 3);
@@ -53,7 +53,7 @@ void VesperReaderFooter::drawBattery(GfxRenderer& renderer, const Rect& rect) {
   }
 }
 
-void VesperReaderFooter::draw(GfxRenderer& renderer, const Data& data, const bool clearBackground) {
+void VesperReaderFooter::draw(const GfxRenderer& renderer, const Data& data, const bool clearBackground) {
   if (!hasContent()) return;
 
   int mt, mr, mb, ml;
