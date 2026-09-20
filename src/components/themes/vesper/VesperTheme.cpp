@@ -242,7 +242,9 @@ void VesperTheme::drawHeader(const GfxRenderer& renderer, const Rect rect, const
                              const char* subtitle) const {
   BaseTheme::drawHeader(renderer, rect, title, subtitle);
 
-  constexpr int logoSize = 30;
+  // The approved source mark is 65px; 30px destroyed the internal feather
+  // cuts on the X4 Pro. Keep enough source detail to survive the e-ink panel.
+  constexpr int logoSize = 42;
   constexpr int wordGap = 7;
   constexpr const char* word = "VESPER UI";
   const int wordWidth = renderer.getTextWidth(NOTOSERIF_12_FONT_ID, word, EpdFontFamily::REGULAR);

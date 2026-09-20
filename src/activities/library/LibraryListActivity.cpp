@@ -990,7 +990,8 @@ void LibraryListActivity::drawVesperCoverEntry(const int entry, const int x, con
 void LibraryListActivity::renderVesperHeader() {
   const auto& metrics = UITheme::getInstance().getMetrics();
   const int sw = renderer.getScreenWidth();
-  GUI.drawHeader(renderer, Rect{0, metrics.topPadding, sw, metrics.headerHeight}, tr(STR_HOME));
+  const std::string homeLabel = std::string("< ") + tr(STR_HOME);
+  GUI.drawHeader(renderer, Rect{0, metrics.topPadding, sw, metrics.headerHeight}, homeLabel.c_str());
 
   const int iconY = metrics.topPadding + (metrics.headerHeight - 24) / 2;
   renderer.drawIcon(Search24IconBits, sw - 122, iconY, 24);
