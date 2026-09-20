@@ -1195,9 +1195,9 @@ void EpubReaderActivity::renderBook() {
   const bool vesperTheme = SETTINGS.uiTheme == CrossPointSettings::UI_THEME::VESPERUI;
   const bool vesperFooter = vesperTheme && VesperReaderFooter::hasContent();
   const uint8_t statusBarHeight =
-      vesperTheme ? (vesperFooter && SETTINGS.immersiveMode == 0 ? static_cast<uint8_t>(VesperReaderFooter::height())
-                                                                 : 0)
-                  : UITheme::getInstance().getStatusBarHeight();
+      vesperTheme
+          ? (vesperFooter && SETTINGS.immersiveMode == 0 ? static_cast<uint8_t>(VesperReaderFooter::height()) : 0)
+          : UITheme::getInstance().getStatusBarHeight();
 
   if (vesperTheme) {
     // VesperUI owns this lane completely. Immersion Mode, or disabling every
